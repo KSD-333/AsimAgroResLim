@@ -31,15 +31,20 @@ const ContactPage: React.FC = () => {
 
     try {
       const formData = {
-        ...formState,
+        name: formState.name,
+        email: formState.email,
+        phone: formState.phone,
+        subject: formState.subject,
+        message: formState.message,
         type: 'message',
         status: 'pending',
         createdAt: serverTimestamp(),
-        userId: user?.uid || 'anonymous',
+        userId: user?.uid || null,
         userName: user?.displayName || formState.name,
         userEmail: user?.email || formState.email
       };
 
+      console.log('Submitting contact form:', formData);
       await addDoc(collection(db, 'contactForms'), formData);
       
       // Show success message
@@ -56,9 +61,10 @@ const ContactPage: React.FC = () => {
       setTimeout(() => {
         setFormSubmitted(false);
       }, 5000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting form:', error);
-      setError('Failed to submit form. Please check whether you logged in or not and try again.');
+      console.error('Error details:', error.code, error.message);
+      setError(`Failed to submit form: ${error.message || 'Please try again later.'}`);
     } finally {
       setLoading(false);
     }

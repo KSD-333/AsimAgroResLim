@@ -15,6 +15,7 @@ const ProductDetailPage: React.FC = () => {
   const { user, userRole } = useAuth();
   const { addItem } = useCart();
   const [quantity, setQuantity] = useState(1);
+  const [selectedSize, setSelectedSize] = useState('');
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +29,37 @@ const ProductDetailPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  // Get price info for selected size
+  const getCurrentPriceInfo = () => {
+    if (!product) return { price: 0, discount: 0, finalPrice: 0, stock: 0 };
+    
+    if (product.priceVariants && product.priceVariants.length > 0) {
+      const variant = product.priceVariants.find(v => v.size === selectedSize);
+      if (variant) {
+        const discount = variant.discount || product.discount || 0;
+        const finalPrice = discount > 0 ? (variant.price * (100 - discount)) / 100 : variant.price;
+        return {
+          price: variant.price || 0,
+          discount: discount || 0,
+          finalPrice: finalPrice || 0,
+          stock: variant.stock || 0
+        };
+      }
+    }
+    
+    const price = product.price || 0;
+    const discount = product.discount || 0;
+    const discountedPrice = product.discountedPrice || (discount > 0 ? (price * (100 - discount)) / 100 : price);
+    
+    return {
+      price: price,
+      discount: discount,
+      finalPrice: discountedPrice,
+      stock: product.stockQuantity || 0
+    };
+  };
 
   const fetchReviews = async () => {
     if (!id) {
@@ -179,15 +211,23 @@ const ProductDetailPage: React.FC = () => {
           const productData = productDoc.data();
           console.log('Raw product data:', productData);
           
-          const formattedProduct = {
+          const formattedProduct: Product = {
             id: productDoc.id,
             name: productData.name || '',
             description: productData.description || '',
             shortDescription: productData.shortDescription || '',
             sizes: productData.sizes || [],
             imageUrl: productData.imageUrl || '',
+            images: productData.images || [],
             category: productData.category || '',
             price: productData.price || 0,
+            discount: productData.discount || 0,
+            discountedPrice: productData.discount > 0 
+              ? (productData.price * (100 - productData.discount)) / 100 
+              : productData.price,
+            stockQuantity: productData.stockQuantity || 0,
+            priceVariants: productData.priceVariants || [],
+            customChemicals: productData.customChemicals || [],
             nutrients: {
               nitrogen: productData.nitrogen || 0,
               phosphorus: productData.phosphorus || 0,
@@ -196,11 +236,18 @@ const ProductDetailPage: React.FC = () => {
             },
             applicationMethod: productData.applicationMethod || '',
             benefits: productData.benefits || [],
-            stockAvailability: productData.stockAvailability || false
+            stockAvailability: productData.stockAvailability || productData.stockQuantity > 0
           };
           
           console.log('Formatted product data:', formattedProduct);
           setProduct(formattedProduct as Product);
+          
+          // Auto-select smallest size
+          if (formattedProduct.priceVariants && formattedProduct.priceVariants.length > 0) {
+            setSelectedSize(formattedProduct.priceVariants[0].size);
+          } else if (formattedProduct.sizes && formattedProduct.sizes.length > 0) {
+            setSelectedSize(formattedProduct.sizes[0]);
+          }
           
           // Fetch reviews after product is loaded
           console.log('Product loaded successfully, fetching reviews...');
@@ -232,13 +279,22 @@ const ProductDetailPage: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!product) return;
+    if (!selectedSize) {
+      setToastMessage('Please select a size');
+      setShowToast(true);
+      return;
+    }
+    
+    const priceInfo = getCurrentPriceInfo();
+    
     addItem({
       id: product.id,
       name: product.name,
       quantity,
-      size: product.sizes[0] || 'default',
+      size: selectedSize,
+      price: priceInfo.finalPrice,
       image: product.imageUrl,
-      nutrients: product.nutrients
+      nutrients: product.nutrients || undefined
     });
     setShowToast(true);
     setToastMessage(`${product.name} added to cart`);
@@ -400,6 +456,55 @@ const ProductDetailPage: React.FC = () => {
     );
   }
 
+  // Price Display Component
+  const PriceDisplay = () => {
+    try {
+      const priceInfo = getCurrentPriceInfo();
+      
+      return (
+        <div className="mb-6">
+          {priceInfo.discount > 0 ? (
+            <div className="flex items-center space-x-3">
+              <span className="text-3xl font-bold text-green-600">
+                ₹{priceInfo.finalPrice.toFixed(2)}
+              </span>
+              <span className="text-xl text-gray-400 line-through">
+                ₹{priceInfo.price.toFixed(2)}
+              </span>
+              <span className="bg-red-100 text-red-600 px-3 py-1 rounded-full text-sm font-semibold">
+                Save {priceInfo.discount}%
+              </span>
+            </div>
+          ) : (
+            <span className="text-3xl font-bold text-green-600">
+              ₹{priceInfo.finalPrice.toFixed(2)}
+            </span>
+          )}
+          
+          {/* Stock Info */}
+          {priceInfo.stock > 0 ? (
+            <p className="text-sm text-gray-600 mt-2">
+              {priceInfo.stock} units in stock
+            </p>
+          ) : (
+            <p className="text-sm text-red-600 mt-2">
+              Out of stock
+            </p>
+          )}
+        </div>
+      );
+    } catch (error) {
+      console.error('Error in PriceDisplay:', error);
+      return (
+        <div className="mb-6">
+          <span className="text-3xl font-bold text-green-600">
+            ₹{product?.price?.toFixed(2) || '0.00'}
+          </span>
+        </div>
+      );
+    }
+  };
+
   return (
     <div className="min-h-screen pt-20">
       <div className="container-custom py-8">
@@ -416,57 +521,183 @@ const ProductDetailPage: React.FC = () => {
         </nav>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Product Image */}
+          {/* Product Image Gallery */}
           <div className="animate-fade-in">
-            <div className="relative h-96 md:h-[500px] rounded-lg overflow-hidden shadow-lg">
+            <div className="relative h-96 md:h-[500px] rounded-lg overflow-hidden shadow-lg mb-4">
               <img
-                src={product.imageUrl}
-                alt={product.name}
+                src={product.images?.[selectedImageIndex]?.url || product.imageUrl}
+                alt={product.images?.[selectedImageIndex]?.alt || product.name}
                 className="w-full h-full object-cover"
               />
               <div className="absolute top-4 right-4 bg-accent-500 text-secondary-800 px-3 py-1 rounded-full text-sm font-medium">
                 {product.category}
               </div>
+              {(product.discount || 0) > 0 && (
+                <div className="absolute top-4 left-4 bg-red-500 text-white px-4 py-2 rounded-full text-lg font-bold shadow-lg">
+                  {product.discount}% OFF
+                </div>
+              )}
             </div>
+            
+            {/* Thumbnail Gallery */}
+            {product.images && product.images.length > 1 && (
+              <div className="grid grid-cols-4 gap-2">
+                {product.images.map((image, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImageIndex(index)}
+                    className={`relative h-20 rounded-lg overflow-hidden border-2 transition ${
+                      selectedImageIndex === index 
+                        ? 'border-green-500 ring-2 ring-green-200' 
+                        : 'border-gray-200 hover:border-green-300'
+                    }`}
+                  >
+                    <img
+                      src={image.url}
+                      alt={image.alt || `${product.name} - Image ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {image.isPrimary && (
+                      <span className="absolute bottom-0 left-0 right-0 bg-green-500 text-white text-xs py-0.5 text-center">
+                        Main
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           
           {/* Product Info */}
           <div className="animate-slide-up">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{product.name}</h1>
             
-            <p className="text-gray-700 mb-6">{product.description}</p>
-            
-            {/* Nutrient Content */}
-            <div className="bg-gray-50 p-6 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold mb-4">Nutrient Content</h3>
-              <div className="grid grid-cols-3 gap-4 mb-4">
-                <div className="text-center">
-                  <div className="text-blue-500 font-bold text-2xl mb-1">{product.nutrients.nitrogen}%</div>
-                  <div className="text-gray-600 text-sm">Nitrogen (N)</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-green-500 font-bold text-2xl mb-1">{product.nutrients.phosphorus}%</div>
-                  <div className="text-gray-600 text-sm">Phosphorus (P)</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-purple-500 font-bold text-2xl mb-1">{product.nutrients.potassium}%</div>
-                  <div className="text-gray-600 text-sm">Potassium (K)</div>
+            {/* Size Selector */}
+            {((product.priceVariants && product.priceVariants.length > 0) || (product.sizes && product.sizes.length > 0)) && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Package Size</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {product.priceVariants && product.priceVariants.length > 0 ? (
+                    product.priceVariants.map((variant, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedSize(variant.size)}
+                        className={`relative p-4 rounded-lg border-2 transition-all duration-200 ${
+                          selectedSize === variant.size
+                            ? 'border-primary-600 bg-primary-50 shadow-md'
+                            : 'border-gray-300 bg-white hover:border-primary-300 hover:shadow-sm'
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className={`text-xl font-bold ${
+                            selectedSize === variant.size ? 'text-primary-700' : 'text-gray-900'
+                          }`}>
+                            {variant.size}
+                          </div>
+                          <div className="text-sm text-gray-500 mt-1">
+                            ₹{variant.price?.toFixed(2) || '0.00'}
+                          </div>
+                          {variant.stock !== undefined && (
+                            <div className={`text-xs mt-1 ${variant.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {variant.stock > 0 ? `${variant.stock} in stock` : 'Out of stock'}
+                            </div>
+                          )}
+                        </div>
+                        {selectedSize === variant.size && (
+                          <div className="absolute -top-2 -right-2 bg-primary-600 text-white rounded-full p-1">
+                            <Check className="h-4 w-4" />
+                          </div>
+                        )}
+                      </button>
+                    ))
+                  ) : (
+                    product.sizes?.map((size, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedSize(size)}
+                        className={`relative p-4 rounded-lg border-2 transition-all duration-200 ${
+                          selectedSize === size
+                            ? 'border-primary-600 bg-primary-50 shadow-md'
+                            : 'border-gray-300 bg-white hover:border-primary-300 hover:shadow-sm'
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className={`text-xl font-bold ${
+                            selectedSize === size ? 'text-primary-700' : 'text-gray-900'
+                          }`}>
+                            {size}
+                          </div>
+                        </div>
+                        {selectedSize === size && (
+                          <div className="absolute -top-2 -right-2 bg-primary-600 text-white rounded-full p-1">
+                            <Check className="h-4 w-4" />
+                          </div>
+                        )}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
-              
-              {product.nutrients.otherNutrients && Object.keys(product.nutrients.otherNutrients).length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h4 className="text-md font-medium mb-2">Micronutrients:</h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    {Object.entries(product.nutrients.otherNutrients).map(([name, value]) => (
-                      <div key={name} className="text-sm">
-                        <span className="font-medium">{name.charAt(0).toUpperCase() + name.slice(1)}:</span> {value}%
-                      </div>
-                    ))}
+            )}
+            
+            {/* Price Section */}
+            <PriceDisplay />
+            
+            <p className="text-gray-700 mb-6">{product.description}</p>
+            
+            {/* Nutrient Content - Only show if there are actual values or custom chemicals */}
+            {((product.nutrients?.nitrogen > 0 || product.nutrients?.phosphorus > 0 || product.nutrients?.potassium > 0) ||
+              (product.nutrients?.otherNutrients && Object.keys(product.nutrients.otherNutrients).length > 0) ||
+              (product.customChemicals && product.customChemicals.length > 0)) && (
+              <div className="bg-gray-50 p-6 rounded-lg mb-6">
+                <h3 className="text-lg font-semibold mb-4">Nutrient Content</h3>
+                
+                {/* NPK Values - Only show if at least one is greater than 0 */}
+                {(product.nutrients?.nitrogen > 0 || product.nutrients?.phosphorus > 0 || product.nutrients?.potassium > 0) && (
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div className="text-center">
+                      <div className="text-blue-500 font-bold text-2xl mb-1">{product.nutrients.nitrogen}%</div>
+                      <div className="text-gray-600 text-sm">Nitrogen (N)</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-green-500 font-bold text-2xl mb-1">{product.nutrients.phosphorus}%</div>
+                      <div className="text-gray-600 text-sm">Phosphorus (P)</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-purple-500 font-bold text-2xl mb-1">{product.nutrients.potassium}%</div>
+                      <div className="text-gray-600 text-sm">Potassium (K)</div>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+                
+                {product.nutrients?.otherNutrients && Object.keys(product.nutrients.otherNutrients).length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="text-md font-medium mb-2">Micronutrients:</h4>
+                    <div className="grid grid-cols-3 gap-2">
+                      {Object.entries(product.nutrients.otherNutrients).map(([name, value]) => (
+                        <div key={name} className="text-sm">
+                          <span className="font-medium">{name.charAt(0).toUpperCase() + name.slice(1)}:</span> {value}%
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {product.customChemicals && product.customChemicals.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="text-md font-medium mb-3">Additional Chemicals:</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {product.customChemicals.map((chemical, index) => (
+                        <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
+                          <div className="font-semibold text-gray-900">{chemical.name}</div>
+                          <div className="text-lg text-blue-600 font-bold">{chemical.percentage}{chemical.unit || '%'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             
             {/* Benefits */}
             {product.benefits && product.benefits.length > 0 && (

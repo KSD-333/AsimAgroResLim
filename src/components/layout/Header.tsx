@@ -100,15 +100,15 @@ const Header: React.FC<HeaderProps> = ({ user, userRole }) => {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-white shadow-md' : 'bg-transparent'
+        isScrolled ? 'bg-white shadow-md' : 'bg-gradient-to-b from-black/70 to-transparent backdrop-blur-sm'
       }`}
     >
       <div className="container-custom py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <Leaf className="h-8 w-8 text-primary-600" />
-            <span className="text-xl font-bold text-primary-900">ASIM AGRO</span>
+            <Leaf className={`h-8 w-8 transition-colors ${isScrolled ? 'text-primary-600' : 'text-white'}`} />
+            <span className={`text-xl font-bold transition-colors ${isScrolled ? 'text-primary-900' : 'text-white'}`}>ASIM AGRO</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -121,8 +121,8 @@ const Header: React.FC<HeaderProps> = ({ user, userRole }) => {
                   onClick={handleProtectedNav(link.path)}
                   className={`text-sm font-medium transition-colors ${
                     location.pathname === link.path
-                      ? 'text-primary-600'
-                      : 'text-gray-600 hover:text-primary-600'
+                      ? (isScrolled ? 'text-primary-600' : 'text-accent-300')
+                      : (isScrolled ? 'text-gray-600 hover:text-primary-600' : 'text-white hover:text-accent-300')
                   }`}
                 >
                   {link.name}
@@ -133,8 +133,8 @@ const Header: React.FC<HeaderProps> = ({ user, userRole }) => {
                   to={link.path}
                   className={`text-sm font-medium transition-colors ${
                     location.pathname === link.path
-                      ? 'text-primary-600'
-                      : 'text-gray-600 hover:text-primary-600'
+                      ? (isScrolled ? 'text-primary-600' : 'text-accent-300')
+                      : (isScrolled ? 'text-gray-600 hover:text-primary-600' : 'text-white hover:text-accent-300')
                   }`}
                 >
                   {link.name}
@@ -148,7 +148,9 @@ const Header: React.FC<HeaderProps> = ({ user, userRole }) => {
             <a
               href={`/${routeMap.cart}`}
               onClick={handleProtectedNav(`/${routeMap.cart}`)}
-              className="relative text-gray-600 hover:text-primary-600"
+              className={`relative transition-colors ${
+                isScrolled ? 'text-gray-600 hover:text-primary-600' : 'text-white hover:text-accent-300'
+              }`}
             >
               <ShoppingCart className="h-6 w-6" />
               {totalItems > 0 && (
@@ -161,7 +163,9 @@ const Header: React.FC<HeaderProps> = ({ user, userRole }) => {
             {user ? (
               <div ref={dropdownRef} className="relative">
                 <button 
-                  className="flex items-center space-x-2 text-gray-600 hover:text-primary-600"
+                  className={`flex items-center space-x-2 transition-colors ${
+                    isScrolled ? 'text-gray-600 hover:text-primary-600' : 'text-white hover:text-accent-300'
+                  }`}
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                   <User className="w-6 h-6" />
@@ -202,7 +206,9 @@ const Header: React.FC<HeaderProps> = ({ user, userRole }) => {
               <div className="flex items-center space-x-4">
                 <Link
                   to={`/${routeMap.login}`}
-                  className="text-gray-600 hover:text-primary-600"
+                  className={`transition-colors ${
+                    isScrolled ? 'text-gray-600 hover:text-primary-600' : 'text-white hover:text-accent-300'
+                  }`}
                 >
                   Login
                 </Link>
@@ -212,7 +218,9 @@ const Header: React.FC<HeaderProps> = ({ user, userRole }) => {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden text-gray-600 hover:text-primary-600 transition-colors"
+            className={`md:hidden transition-colors ${
+              isScrolled ? 'text-gray-600 hover:text-primary-600' : 'text-white hover:text-accent-300'
+            }`}
             onClick={toggleMenu}
           >
             {isMenuOpen ? (

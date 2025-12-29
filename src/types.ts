@@ -5,8 +5,27 @@ export interface Product {
   shortDescription: string;
   sizes: string[];
   imageUrl: string;
+  images?: Array<{
+    url: string;
+    alt?: string;
+    isPrimary?: boolean;
+  }>;
   category: string;
   price: number;
+  discount: number;
+  discountedPrice?: number;
+  stockQuantity?: number;
+  priceVariants?: Array<{
+    size: string;
+    price: number;
+    discount?: number;
+    stock?: number;
+  }>;
+  customChemicals?: Array<{
+    name: string;
+    percentage: number;
+    unit?: string;
+  }>;
   nutrients: {
     nitrogen: number;
     phosphorus: number;

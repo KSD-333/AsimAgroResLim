@@ -21,11 +21,15 @@ import {
   CheckCircle,
   Clock,
   LayoutDashboard,
-  FileText
+  FileText,
+  Edit2,
+  Upload,
+  Menu
 } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { auth } from '../firebase';
 import { routeMap } from '../routeMap';
+import { useAuth } from '../context/AuthContext';
 
 interface DashboardStats {
   totalUsers: number;
@@ -43,9 +47,20 @@ interface Product {
   sizes: string[];
   imageUrl: string;
   category: string;
+  price?: number;
+  discount?: number;
+  stockQuantity?: number;
+  priceVariants?: Array<{
+    size: string;
+    price: number;
+    discount?: number;
+    stock?: number;
+  }>;
   nitrogen?: number;
   phosphorus?: number;
   potassium?: number;
+  images?: any[];
+  customChemicals?: any[];
 }
 
 interface Order {
@@ -87,6 +102,7 @@ interface ContactForm {
 }
 
 const AdminDashboard = () => {
+  const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalOrders: 0,
@@ -101,11 +117,20 @@ const AdminDashboard = () => {
     description: '',
     sizes: '',
     category: '',
-    imageUrl: '',
+    price: '',
+    discount: '',
+    stockQuantity: '',
     nitrogen: '',
     phosphorus: '',
     potassium: ''
   });
+  const [productImages, setProductImages] = useState<File[]>([]);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [customChemicals, setCustomChemicals] = useState<Array<{name: string, percentage: string}>>([]);
+  const [priceVariants, setPriceVariants] = useState<Array<{size: string, price: string, discount: string, stock: string}>>([]);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -123,9 +148,7 @@ const AdminDashboard = () => {
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [editProductData, setEditProductData] = useState<any>({});
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const fetchDashboardData = async () => {
     try {
@@ -230,45 +253,140 @@ const AdminDashboard = () => {
     };
   }, []);
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    if (productImages.length + files.length > 8) {
+      setError('Maximum 8 images allowed per product');
+      return;
+    }
+
+    setProductImages(prev => [...prev, ...files]);
+    
+    // Create preview URLs
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviewUrls(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setProductImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!newProduct.imageUrl) {
-      setError('Please provide an image URL');
+    if (productImages.length === 0) {
+      setError('Please upload at least 1 product image');
+      return;
+    }
+
+    if (productImages.length > 8) {
+      setError('Maximum 8 images allowed per product');
       return;
     }
 
     try {
       setLoading(true);
+      setUploadingImages(true);
+
+      // Upload images first
+      const formData = new FormData();
+      productImages.forEach((file) => {
+        formData.append('images', file);
+      });
+
+      const uploadResponse = await fetch('/api/products/upload-images', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${await user?.getIdToken()}`
+        }
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload images');
+      }
+
+      const { data: uploadedImages } = await uploadResponse.json();
+      setUploadingImages(false);
+
+      // Create product with uploaded images
       const sizesArray = newProduct.sizes.split(',').map(size => size.trim());
+      
+      // Prepare priceVariants if they exist
+      const variantsData = priceVariants
+        .filter(v => v.size && v.price)
+        .map(v => ({
+          size: v.size.trim(),
+          price: Number(v.price),
+          discount: Number(v.discount) || 0,
+          stock: Number(v.stock) || 0
+        }));
       
       const productData = {
         name: newProduct.name,
         description: newProduct.description,
-        sizes: sizesArray,
+        sizes: variantsData.length > 0 ? variantsData.map(v => v.size) : sizesArray,
         category: newProduct.category,
-        imageUrl: newProduct.imageUrl,
-        createdAt: new Date(),
-        // Only include nutrient values if they are provided
-        ...(newProduct.nitrogen && { nitrogen: Number(newProduct.nitrogen) }),
-        ...(newProduct.phosphorus && { phosphorus: Number(newProduct.phosphorus) }),
-        ...(newProduct.potassium && { potassium: Number(newProduct.potassium) })
+        price: Number(newProduct.price),
+        discount: Number(newProduct.discount) || 0,
+        stockQuantity: Number(newProduct.stockQuantity),
+        priceVariants: variantsData.length > 0 ? variantsData : undefined,
+        images: uploadedImages,
+        nutrients: {
+          nitrogen: newProduct.nitrogen ? Number(newProduct.nitrogen) : 0,
+          phosphorus: newProduct.phosphorus ? Number(newProduct.phosphorus) : 0,
+          potassium: newProduct.potassium ? Number(newProduct.potassium) : 0,
+        },
+        customChemicals: customChemicals
+          .filter(c => c.name && c.percentage)
+          .map(c => ({
+            name: c.name,
+            percentage: Number(c.percentage),
+            unit: '%'
+          }))
       };
 
-      const docRef = await addDoc(collection(db, 'products'), productData);
-      setProducts(prevProducts => [...prevProducts, { id: docRef.id, ...productData }]);
+      const response = await fetch('/api/products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await user?.getIdToken()}`
+        },
+        body: JSON.stringify(productData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create product');
+      }
+
+      const { data: newProductData } = await response.json();
+      setProducts(prevProducts => [...prevProducts, newProductData]);
       
+      // Reset form
       setNewProduct({
         name: '',
         description: '',
         sizes: '',
         category: '',
-        imageUrl: '',
+        price: '',
+        discount: '',
+        stockQuantity: '',
         nitrogen: '',
         phosphorus: '',
         potassium: ''
       });
+      setProductImages([]);
+      setImagePreviewUrls([]);
+      setCustomChemicals([]);
+      setPriceVariants([]);
       
       setError('Product added successfully!');
       setTimeout(() => {
@@ -501,41 +619,135 @@ const AdminDashboard = () => {
   };
 
   const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
-    setEditProductData({ ...product, sizes: product.sizes.join(', ') });
+    setEditingProduct({
+      ...product,
+      price: product.price || 0,
+      discount: product.discount || 0,
+      stockQuantity: product.stockQuantity || 0
+    });
+    setProductImages([]);
+    setImagePreviewUrls(product.images?.map(img => img.url) || []);
+    setCustomChemicals(product.customChemicals?.map(c => ({name: c.name, percentage: c.percentage.toString()})) || []);
+    
+    // Load existing price variants if available
+    if (product.priceVariants && product.priceVariants.length > 0) {
+      setPriceVariants(product.priceVariants.map(v => ({
+        size: v.size,
+        price: v.price.toString(),
+        discount: (v.discount || 0).toString(),
+        stock: (v.stock || 0).toString()
+      })));
+    } else {
+      setPriceVariants([]);
+    }
+    
     setShowEditModal(true);
   };
 
-  const handleEditProductChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setEditProductData((prev: any) => ({ ...prev, [name]: value }));
+  const handleEditImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    if (imagePreviewUrls.length + files.length > 8) {
+      setError('Maximum 8 images allowed per product');
+      return;
+    }
+
+    setProductImages(prev => [...prev, ...files]);
+    
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviewUrls(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveEditImage = (index: number) => {
+    setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
+    if (index < (editingProduct?.images?.length || 0)) {
+      // Mark existing image for deletion
+      setEditingProduct((prev: any) => ({
+        ...prev,
+        imagesToDelete: [...(prev.imagesToDelete || []), prev.images[index]]
+      }));
+    } else {
+      // Remove from new uploads
+      const newIndex = index - (editingProduct?.images?.length || 0);
+      setProductImages(prev => prev.filter((_, i) => i !== newIndex));
+    }
   };
 
   const handleSaveEditProduct = async () => {
     if (!editingProduct) return;
+    
     try {
-      const sizesArray = editProductData.sizes.split(',').map((s: string) => s.trim());
-      await updateDoc(doc(db, 'products', editingProduct.id), {
-        name: editProductData.name,
-        description: editProductData.description,
-        sizes: sizesArray,
-        category: editProductData.category,
-        imageUrl: editProductData.imageUrl,
-        nitrogen: editProductData.nitrogen ? Number(editProductData.nitrogen) : undefined,
-        phosphorus: editProductData.phosphorus ? Number(editProductData.phosphorus) : undefined,
-        potassium: editProductData.potassium ? Number(editProductData.potassium) : undefined,
-      });
+      setLoading(true);
+      setError(null);
+
+      // Parse sizes
+      const sizesArray = typeof editingProduct.sizes === 'string'
+        ? editingProduct.sizes.split(',').map((s: string) => s.trim()).filter((s: string) => s)
+        : (editingProduct.sizes || []);
+      
+      // Prepare priceVariants from editing state
+      const variantsData = priceVariants
+        .filter(v => v.size && v.price)
+        .map(v => ({
+          size: v.size.trim(),
+          price: Number(v.price),
+          discount: Number(v.discount) || 0,
+          stock: Number(v.stock) || 0
+        }));
+      
+      // Prepare product data
+      const productData: any = {
+        name: editingProduct.name || '',
+        description: editingProduct.description || '',
+        sizes: variantsData.length > 0 ? variantsData.map(v => v.size) : sizesArray,
+        category: editingProduct.category || '',
+        imageUrl: editingProduct.imageUrl || editingProduct.image || '',
+        price: Number(editingProduct.price) || 0,
+        discount: Number(editingProduct.discount) || 0,
+        stockQuantity: Number(editingProduct.stockQuantity) || 0,
+        priceVariants: variantsData.length > 0 ? variantsData : undefined,
+        updatedAt: new Date()
+      };
+
+      // Add nutrients if they exist
+      if (editingProduct.nitrogen !== undefined || editingProduct.phosphorus !== undefined || editingProduct.potassium !== undefined) {
+        productData.nitrogen = Number(editingProduct.nitrogen) || 0;
+        productData.phosphorus = Number(editingProduct.phosphorus) || 0;
+        productData.potassium = Number(editingProduct.potassium) || 0;
+      }
+
+      // Update product in Firebase
+      const productRef = doc(db, 'products', editingProduct.id);
+      await updateDoc(productRef, productData);
+      
+      // Get the updated product
+      const updatedDoc = await getDoc(productRef);
+      const updatedProduct = { id: updatedDoc.id, ...updatedDoc.data() } as Product;
+      
+      // Update local state
       setProducts((prev) =>
-        prev.map((p) =>
-          p.id === editingProduct.id
-            ? { ...p, ...editProductData, sizes: sizesArray }
-            : p
-        )
+        prev.map((p) => p.id === editingProduct.id ? updatedProduct : p)
       );
+      
       setShowEditModal(false);
       setEditingProduct(null);
-    } catch (error) {
-      setError('Failed to update product.');
+      setProductImages([]);
+      setImagePreviewUrls([]);
+      setCustomChemicals([]);
+      setPriceVariants([]);
+      setError('Product updated successfully!');
+      setTimeout(() => setError(null), 3000);
+      
+    } catch (error: any) {
+      console.error('Error updating product:', error);
+      setError(error.message || 'Failed to update product. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -664,8 +876,8 @@ const AdminDashboard = () => {
 
         {/* Order Update Modal */}
         {selectedOrder && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="fixed inset-0 bg-gradient-to-br from-gray-900/60 via-gray-900/50 to-gray-800/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 transform transition-all">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
                 Update Order #{selectedOrder.id.slice(0, 8)}
               </h3>
@@ -1001,8 +1213,8 @@ const AdminDashboard = () => {
 
             {/* Delete Confirmation Dialog */}
             {userToDelete && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <div className="fixed inset-0 bg-gradient-to-br from-gray-900/60 via-gray-900/50 to-gray-800/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+                <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 transform transition-all">
                   <h3 className="text-lg font-semibold mb-4">Confirm Delete</h3>
                   <p className="text-gray-600 mb-6">
                     Are you sure you want to delete this user? This action cannot be undone.
@@ -1034,9 +1246,9 @@ const AdminDashboard = () => {
 
       case `/${routeMap.adminProducts}`:
         return (
-          <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Products Management</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {products.map((product) => (
                 <div key={product.id} className="border rounded-lg overflow-hidden hover:shadow-lg transition duration-300">
                   <div className="relative">
@@ -1053,9 +1265,10 @@ const AdminDashboard = () => {
                     </button>
                     <button
                       onClick={() => handleEditProduct(product)}
-                      className="absolute top-2 right-12 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition duration-300"
+                      className="absolute top-2 right-14 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition duration-300"
+                      title="Edit Product"
                     >
-                      Edit
+                      <Edit2 className="h-5 w-5" />
                     </button>
                   </div>
                   <div className="p-4">
@@ -1090,7 +1303,7 @@ const AdminDashboard = () => {
           </div>
         );
 
-      case `/${routeMap.adminProducts}/new`:
+      case `/${routeMap.adminProductsNew}`:
         return (
           <div className="bg-white rounded-xl shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Add New Product</h2>
@@ -1144,52 +1357,203 @@ const AdminDashboard = () => {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Price (₹)</label>
+                  <input
+                    type="number"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="e.g., 499"
+                    required
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Discount (%)</label>
+                  <input
+                    type="number"
+                    value={newProduct.discount}
+                    onChange={(e) => setNewProduct({...newProduct, discount: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="e.g., 10"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Stock Quantity</label>
+                  <input
+                    type="number"
+                    value={newProduct.stockQuantity}
+                    onChange={(e) => setNewProduct({...newProduct, stockQuantity: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="e.g., 100"
+                    required
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              {/* Price Variants Section */}
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Size-Based Pricing</h3>
+                    <p className="text-sm text-gray-600">Add different prices for each size variant</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPriceVariants([...priceVariants, {size: '', price: '', discount: '', stock: ''}])}
+                    className="flex items-center px-3 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Size Variant
+                  </button>
+                </div>
+                
+                {priceVariants.length > 0 && (
+                  <div className="space-y-3">
+                    {priceVariants.map((variant, index) => (
+                      <div key={index} className="flex gap-3 items-end bg-gray-50 p-4 rounded-lg">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
+                          <input
+                            type="text"
+                            value={variant.size}
+                            onChange={(e) => {
+                              const updated = [...priceVariants];
+                              updated[index].size = e.target.value;
+                              setPriceVariants(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="e.g., 5kg, 10kg, 25kg"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
+                          <input
+                            type="number"
+                            value={variant.price}
+                            onChange={(e) => {
+                              const updated = [...priceVariants];
+                              updated[index].price = e.target.value;
+                              setPriceVariants(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="499"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                        <div className="w-28">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Discount %</label>
+                          <input
+                            type="number"
+                            value={variant.discount}
+                            onChange={(e) => {
+                              const updated = [...priceVariants];
+                              updated[index].discount = e.target.value;
+                              setPriceVariants(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="0"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                          />
+                        </div>
+                        <div className="w-28">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+                          <input
+                            type="number"
+                            value={variant.stock}
+                            onChange={(e) => {
+                              const updated = [...priceVariants];
+                              updated[index].stock = e.target.value;
+                              setPriceVariants(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="100"
+                            min="0"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPriceVariants(priceVariants.filter((_, i) => i !== index))}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {priceVariants.length === 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
+                    <p className="mb-2"><strong>Note:</strong> If you don't add size variants, the product will use the default price above for all sizes.</p>
+                    <p>Add size variants to set different prices for each size (e.g., 5kg - ₹500, 10kg - ₹900).</p>
+                  </div>
+                )}
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Sizes (comma-separated)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Package Sizes (comma-separated) - Optional if using variants <span className="text-xs text-gray-500">(include units)</span>
+                </label>
                 <input
                   type="text"
                   value={newProduct.sizes}
                   onChange={(e) => setNewProduct({...newProduct, sizes: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="e.g., 5kg, 10kg, 25kg"
-                  required
+                  placeholder="e.g., 5kg, 10L, 500ml, 25kg"
+                  required={priceVariants.length === 0}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Product Image URL</label>
-                <div className="mt-1">
-                  <input
-                    type="url"
-                    value={newProduct.imageUrl}
-                    onChange={handleImageUrlChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="https://images.unsplash.com/photo-..."
-                    required
-                  />
-                  <div className="mt-2 text-sm text-gray-500 space-y-1">
-                    <p>To get the correct Unsplash image URL:</p>
-                    <ol className="list-decimal list-inside ml-2">
-                      <li>Go to the Unsplash image page</li>
-                      <li>Right-click on the image itself (not the page)</li>
-                      <li>Select "Copy image address" or "Copy image URL"</li>
-                      <li>The URL should start with "https://images.unsplash.com/"</li>
-                    </ol>
-                    <p className="text-red-500 mt-2">Do not use the page URL (the one that starts with "https://unsplash.com/photos/")</p>
-                  </div>
-                </div>
-                {newProduct.imageUrl && (
-                  <div className="mt-4">
-                    <img
-                      src={newProduct.imageUrl}
-                      alt="Preview"
-                      className="w-32 h-32 object-cover rounded-lg"
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        img.onerror = null;
-                        setError('Image failed to load. Make sure you copied the direct image URL (right-click → Copy image address)');
-                      }}
-                    />
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Product Images (1-8 images required)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageSelect}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  disabled={uploadingImages}
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Upload 1-8 high-quality product images. Max 5MB per image.
+                </p>
+                
+                {imagePreviewUrls.length > 0 && (
+                  <div className="mt-4 grid grid-cols-4 gap-4">
+                    {imagePreviewUrls.map((url, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                        {index === 0 && (
+                          <span className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-2 py-1 rounded">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1237,12 +1601,89 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              {/* Custom Chemicals Section */}
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Additional Chemicals</h3>
+                  <button
+                    type="button"
+                    onClick={() => setCustomChemicals([...customChemicals, {name: '', percentage: ''}])}
+                    className="flex items-center px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Chemical
+                  </button>
+                </div>
+                
+                {customChemicals.length > 0 && (
+                  <div className="space-y-3">
+                    {customChemicals.map((chemical, index) => (
+                      <div key={index} className="flex gap-3 items-end">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Chemical Name</label>
+                          <input
+                            type="text"
+                            value={chemical.name}
+                            onChange={(e) => {
+                              const updated = [...customChemicals];
+                              updated[index].name = e.target.value;
+                              setCustomChemicals(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="e.g., Sulfur, Zinc, Boron"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Percentage</label>
+                          <input
+                            type="number"
+                            value={chemical.percentage}
+                            onChange={(e) => {
+                              const updated = [...customChemicals];
+                              updated[index].percentage = e.target.value;
+                              setCustomChemicals(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="0-100"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCustomChemicals(customChemicals.filter((_, i) => i !== index))}
+                          className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <button
                 type="submit"
-                className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-300 flex items-center justify-center"
+                disabled={loading || uploadingImages}
+                className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Plus className="h-5 w-5 mr-2" />
-                Add Product
+                {uploadingImages ? (
+                  <>
+                    <Upload className="h-5 w-5 mr-2 animate-pulse" />
+                    Uploading Images...
+                  </>
+                ) : loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Creating Product...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-5 w-5 mr-2" />
+                    Add Product
+                  </>
+                )}
               </button>
             </form>
           </div>
@@ -1392,7 +1833,7 @@ const AdminDashboard = () => {
         return (
           <>
             {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
               {quickLinks.map((link, index) => (
                 <div
                   key={index}
@@ -1477,7 +1918,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={() => navigate(`/${routeMap.adminProducts}/new`)}
+                    onClick={() => navigate(`/${routeMap.adminProductsNew}`)}
                     className="flex items-center justify-center p-4 bg-primary-50 text-primary-600 rounded-lg hover:bg-primary-100 transition-colors"
                   >
                     <Package className="h-5 w-5 mr-2" />
@@ -1529,10 +1970,80 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container-custom">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 p-2 mt-8 text-center text-green-700">Dashboard</h1>
+    <div className="min-h-screen bg-gray-50 pb-8">
+      {/* Mobile Header with Navigation */}
+      <div className="lg:hidden bg-white shadow-sm sticky top-0 z-40">
+        <div className="flex items-center justify-between p-4">
+          <h1 className="text-xl font-bold text-green-700">Admin Dashboard</h1>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 rounded-md hover:bg-gray-100"
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
+        
+        {/* Mobile Navigation Menu */}
+        {isMobileMenuOpen && (
+          <div className="border-t">
+            <div className="px-4 py-2 space-y-1">
+              <button
+                onClick={() => { navigate(`/${routeMap.adminDashboard}`); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-2 rounded-md ${
+                  currentPath === `/${routeMap.adminDashboard}` ? 'bg-green-100 text-green-700' : 'hover:bg-gray-100'
+                }`}
+              >
+                <LayoutDashboard className="h-4 w-4 inline mr-2" />Overview
+              </button>
+              <button
+                onClick={() => { navigate(`/${routeMap.adminProducts}`); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-2 rounded-md ${
+                  currentPath === `/${routeMap.adminProducts}` ? 'bg-green-100 text-green-700' : 'hover:bg-gray-100'
+                }`}
+              >
+                <Package className="h-4 w-4 inline mr-2" />Products
+              </button>
+              <button
+                onClick={() => { navigate(`/${routeMap.adminOrders}`); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-2 rounded-md ${
+                  currentPath === `/${routeMap.adminOrders}` ? 'bg-green-100 text-green-700' : 'hover:bg-gray-100'
+                }`}
+              >
+                <ShoppingCart className="h-4 w-4 inline mr-2" />Orders
+              </button>
+              <button
+                onClick={() => { navigate(`/${routeMap.adminUsers}`); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-2 rounded-md ${
+                  currentPath === `/${routeMap.adminUsers}` ? 'bg-green-100 text-green-700' : 'hover:bg-gray-100'
+                }`}
+              >
+                <Users className="h-4 w-4 inline mr-2" />Users
+              </button>
+              <button
+                onClick={() => { navigate(`/${routeMap.adminMessages}`); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-2 rounded-md ${
+                  currentPath === `/${routeMap.adminMessages}` ? 'bg-green-100 text-green-700' : 'hover:bg-gray-100'
+                }`}
+              >
+                <MessageSquare className="h-4 w-4 inline mr-2" />Messages
+              </button>
+              <button
+                onClick={() => { navigate(`/${routeMap.adminForms}`); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-2 rounded-md ${
+                  currentPath === `/${routeMap.adminForms}` ? 'bg-green-100 text-green-700' : 'hover:bg-gray-100'
+                }`}
+              >
+                <FileText className="h-4 w-4 inline mr-2" />Forms
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+        <div className="mb-8 pt-8 hidden lg:block">
+          <h1 className="text-3xl font-bold text-gray-900 p-2 text-center text-green-700">Dashboard</h1>
         </div>
 
         {renderContent()}
@@ -1540,8 +2051,8 @@ const AdminDashboard = () => {
 
       {/* Response Modal */}
       {selectedForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-gradient-to-br from-gray-900/60 via-gray-900/50 to-gray-800/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 transform transition-all">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Respond to {selectedForm.type === 'message' ? 'Contact Message' : 'Get Started Form'}
             </h3>
@@ -1578,86 +2089,403 @@ const AdminDashboard = () => {
       )}
 
       {showEditModal && editingProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Edit Product</h3>
-            <div className="space-y-4">
-              <input
-                type="text"
-                name="name"
-                value={editProductData.name}
-                onChange={handleEditProductChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="Product Name"
-              />
-              <textarea
-                name="description"
-                value={editProductData.description}
-                onChange={handleEditProductChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="Description"
-              />
-              <input
-                type="text"
-                name="sizes"
-                value={editProductData.sizes}
-                onChange={handleEditProductChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="Sizes (comma-separated)"
-              />
-              <input
-                type="text"
-                name="category"
-                value={editProductData.category}
-                onChange={handleEditProductChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="Category"
-              />
-              <input
-                type="text"
-                name="imageUrl"
-                value={editProductData.imageUrl}
-                onChange={handleEditProductChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="Image URL"
-              />
-              <input
-                type="number"
-                name="nitrogen"
-                value={editProductData.nitrogen || ''}
-                onChange={handleEditProductChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="Nitrogen (N) %"
-              />
-              <input
-                type="number"
-                name="phosphorus"
-                value={editProductData.phosphorus || ''}
-                onChange={handleEditProductChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="Phosphorus (P) %"
-              />
-              <input
-                type="number"
-                name="potassium"
-                value={editProductData.potassium || ''}
-                onChange={handleEditProductChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                placeholder="Potassium (K) %"
-              />
+        <div className="fixed inset-0 bg-gradient-to-br from-gray-900/60 via-gray-900/50 to-gray-800/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl p-4 sm:p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto transform transition-all">
+            <h3 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-gray-900">Edit Product</h3>
+            
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Product Name</label>
+                  <input
+                    type="text"
+                    value={editingProduct.name}
+                    onChange={(e) => setEditingProduct({...editingProduct, name: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                  <select
+                    value={editingProduct.category}
+                    onChange={(e) => setEditingProduct({...editingProduct, category: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Fertilizers">Fertilizers</option>
+                    <option value="Seeds">Seeds</option>
+                    <option value="Pesticides">Pesticides</option>
+                    <option value="Equipment">Equipment</option>
+                    <option value="Macronutrient">Macronutrient</option>
+                    <option value="Micronutrient">Micronutrient</option>
+                    <option value="Organic">Organic</option>
+                    <option value="Specialty">Specialty</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea
+                  value={editingProduct.description}
+                  onChange={(e) => setEditingProduct({...editingProduct, description: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+                <input
+                  type="url"
+                  value={editingProduct.imageUrl || editingProduct.image || ''}
+                  onChange={(e) => setEditingProduct({...editingProduct, imageUrl: e.target.value, image: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://example.com/image.jpg"
+                />
+                {(editingProduct.imageUrl || editingProduct.image) && (
+                  <div className="mt-2">
+                    <img 
+                      src={editingProduct.imageUrl || editingProduct.image} 
+                      alt="Product preview" 
+                      className="h-32 w-32 object-cover rounded-lg border"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Package Sizes (comma-separated) <span className="text-xs text-gray-500">(include units)</span>
+                </label>
+                <input
+                  type="text"
+                  value={typeof editingProduct.sizes === 'string' ? editingProduct.sizes : (editingProduct.sizes || []).join(', ')}
+                  onChange={(e) => setEditingProduct({...editingProduct, sizes: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 5kg, 10L, 500ml, 25kg"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Price (₹)</label>
+                  <input
+                    type="number"
+                    value={editingProduct.price}
+                    onChange={(e) => setEditingProduct({...editingProduct, price: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Discount (%)</label>
+                  <input
+                    type="number"
+                    value={editingProduct.discount || 0}
+                    onChange={(e) => setEditingProduct({...editingProduct, discount: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    min="0"
+                    max="100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Stock Quantity</label>
+                  <input
+                    type="number"
+                    value={editingProduct.stockQuantity}
+                    onChange={(e) => setEditingProduct({...editingProduct, stockQuantity: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              {/* Price Variants Section */}
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Size-Based Pricing</h3>
+                    <p className="text-sm text-gray-600">Add different prices for each size variant</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPriceVariants([...priceVariants, {size: '', price: '', discount: '', stock: ''}])}
+                    className="flex items-center px-3 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Size Variant
+                  </button>
+                </div>
+                
+                {priceVariants.length > 0 && (
+                  <div className="space-y-3">
+                    {priceVariants.map((variant, index) => (
+                      <div key={index} className="flex gap-3 items-end bg-gray-50 p-4 rounded-lg">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Size</label>
+                          <input
+                            type="text"
+                            value={variant.size}
+                            onChange={(e) => {
+                              const updated = [...priceVariants];
+                              updated[index].size = e.target.value;
+                              setPriceVariants(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="e.g., 5kg, 10kg, 25kg"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
+                          <input
+                            type="number"
+                            value={variant.price}
+                            onChange={(e) => {
+                              const updated = [...priceVariants];
+                              updated[index].price = e.target.value;
+                              setPriceVariants(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="499"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                        <div className="w-28">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Discount %</label>
+                          <input
+                            type="number"
+                            value={variant.discount}
+                            onChange={(e) => {
+                              const updated = [...priceVariants];
+                              updated[index].discount = e.target.value;
+                              setPriceVariants(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="0"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                          />
+                        </div>
+                        <div className="w-28">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+                          <input
+                            type="number"
+                            value={variant.stock}
+                            onChange={(e) => {
+                              const updated = [...priceVariants];
+                              updated[index].stock = e.target.value;
+                              setPriceVariants(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="100"
+                            min="0"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPriceVariants(priceVariants.filter((_, i) => i !== index))}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sizes (comma-separated)</label>
+                <input
+                  type="text"
+                  value={editingProduct.sizes}
+                  onChange={(e) => setEditingProduct({...editingProduct, sizes: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., 5kg, 10kg, 25kg"
+                />
+              </div>
+
+              {/* Product Images */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Product Images</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleEditImageSelect}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={uploadingImages}
+                />
+                {imagePreviewUrls.length > 0 && (
+                  <div className="mt-4 grid grid-cols-4 gap-4">
+                    {imagePreviewUrls.map((url, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEditImage(index)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* NPK Values */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nitrogen (N) %</label>
+                  <input
+                    type="number"
+                    value={editingProduct.nutrients?.nitrogen || 0}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct, 
+                      nutrients: {...editingProduct.nutrients, nitrogen: Number(e.target.value)}
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Phosphorus (P) %</label>
+                  <input
+                    type="number"
+                    value={editingProduct.nutrients?.phosphorus || 0}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct, 
+                      nutrients: {...editingProduct.nutrients, phosphorus: Number(e.target.value)}
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Potassium (K) %</label>
+                  <input
+                    type="number"
+                    value={editingProduct.nutrients?.potassium || 0}
+                    onChange={(e) => setEditingProduct({
+                      ...editingProduct, 
+                      nutrients: {...editingProduct.nutrients, potassium: Number(e.target.value)}
+                    })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                  />
+                </div>
+              </div>
+
+              {/* Custom Chemicals */}
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-semibold text-gray-900">Additional Chemicals</h4>
+                  <button
+                    type="button"
+                    onClick={() => setCustomChemicals([...customChemicals, {name: '', percentage: ''}])}
+                    className="flex items-center px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Chemical
+                  </button>
+                </div>
+                
+                {customChemicals.length > 0 && (
+                  <div className="space-y-3">
+                    {customChemicals.map((chemical, index) => (
+                      <div key={index} className="flex gap-3 items-end">
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            value={chemical.name}
+                            onChange={(e) => {
+                              const updated = [...customChemicals];
+                              updated[index].name = e.target.value;
+                              setCustomChemicals(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="Chemical Name"
+                          />
+                        </div>
+                        <div className="w-32">
+                          <input
+                            type="number"
+                            value={chemical.percentage}
+                            onChange={(e) => {
+                              const updated = [...customChemicals];
+                              updated[index].percentage = e.target.value;
+                              setCustomChemicals(updated);
+                            }}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            placeholder="%"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCustomChemicals(customChemicals.filter((_, i) => i !== index))}
+                          className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex justify-end space-x-4 mt-6">
+
+            <div className="flex justify-end space-x-4 mt-6 pt-6 border-t">
               <button
-                onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingProduct(null);
+                  setProductImages([]);
+                  setImagePreviewUrls([]);
+                  setCustomChemicals([]);
+                }}
+                className="px-6 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEditProduct}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                disabled={loading || uploadingImages}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
-                Save
+                {uploadingImages ? (
+                  <>
+                    <Upload className="h-5 w-5 mr-2 animate-pulse" />
+                    Uploading...
+                  </>
+                ) : loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
               </button>
             </div>
           </div>

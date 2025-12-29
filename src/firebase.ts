@@ -1,17 +1,17 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBclKxruluV_IjeLJ9RDki8p5UOE74Oxv0",
-  authDomain: "asim-agro.firebaseapp.com",
-  databaseURL: "https://asim-agro-default-rtdb.firebaseio.com",
-  projectId: "asim-agro",
-  storageBucket: "asim-agro.appspot.com",
-  messagingSenderId: "277591272055",
-  appId: "1:277591272055:web:282acf79136380c5caf472",
-  measurementId: "G-K3P94QM7E2"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);
@@ -23,21 +23,16 @@ const db = initializeFirestore(app, {
   })
 });
 
-// Initialize Auth
+// Initialize Auth with persistence
 const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error("Auth persistence error:", error);
+});
 
 // Initialize Storage
 const storage = getStorage(app);
 
-// Configure CORS for storage
-const corsConfig = {
-  origin: ["http://localhost:5174", "http://localhost:5173", "http://localhost:3000"],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  maxAgeSeconds: 3600
-};
-
-// Apply CORS configuration
+// Apply CORS configuration for development
 if (process.env.NODE_ENV === 'development') {
   // In development, we can use the emulator
   connectStorageEmulator(storage, 'localhost', 9199);

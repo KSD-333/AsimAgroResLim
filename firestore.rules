@@ -53,9 +53,16 @@ service cloud.firestore {
     }
 
     // Contact forms collection
+    match /contactForms/{formId} {
+      allow read: if isAdmin();
+      allow create: if true;  // Allow anyone to create contact forms
+      allow update, delete: if isAdmin();
+    }
+
+    // Legacy contactForm path (keeping for backward compatibility)
     match /contactForm/{formId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated();
+      allow create: if true;
       allow update, delete: if isAdmin();
     }
 

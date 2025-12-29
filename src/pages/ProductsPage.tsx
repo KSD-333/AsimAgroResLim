@@ -96,7 +96,7 @@ const ProductsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pt-20">
+    <div className="min-h-screen pt-20 animate-fade-in">
       {/* Header */}
       <div className="bg-primary-800 py-12">
         <div className="container-custom">

@@ -24,26 +24,29 @@ const ContactForm: React.FC<ContactFormProps> = ({ type }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      setError('Please login to submit the form');
-      return;
-    }
-
+    
     setLoading(true);
     setError(null);
 
     try {
       const formDataToSubmit = {
-        ...formData,
-        userId: user.uid,
-        userName: user.displayName || 'Anonymous',
-        userEmail: user.email,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        message: formData.message,
+        businessType: formData.businessType,
+        location: formData.location,
+        userId: user?.uid || null,
+        userName: user?.displayName || formData.name,
+        userEmail: user?.email || formData.email,
         type,
         status: 'pending',
         createdAt: serverTimestamp()
       };
 
+      console.log('Submitting form:', formDataToSubmit);
       await addDoc(collection(db, 'contactForms'), formDataToSubmit);
+      
       setSuccess(true);
       setFormData({
         name: '',
@@ -53,9 +56,13 @@ const ContactForm: React.FC<ContactFormProps> = ({ type }) => {
         businessType: '',
         location: ''
       });
-    } catch (error) {
+      
+      // Hide success message after 5 seconds
+      setTimeout(() => setSuccess(false), 5000);
+    } catch (error: any) {
       console.error('Error submitting form:', error);
-      setError('Failed to submit form. Please try again.');
+      console.error('Error details:', error.code, error.message);
+      setError(`Failed to submit form: ${error.message || 'Please try again later.'}`);
     } finally {
       setLoading(false);
     }

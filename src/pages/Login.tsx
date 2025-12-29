@@ -56,11 +56,6 @@ const AuthForm = () => {
       if (isLogin) {
         // Login
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        if (!userCredential.user.emailVerified) {
-          setShowVerifyEmail(true);
-          setLoading(false);
-          return;
-        }
         // Save credentials if remember me is checked
         if (rememberMe) {
           localStorage.setItem('userEmail', email);
@@ -91,19 +86,35 @@ const AuthForm = () => {
         // Register
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName });
-        await sendEmailVerification(userCredential.user);
+        
+        // Create user document in Firestore
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           displayName,
           email,
           role: 'user',
           createdAt: new Date()
         });
+        
+        // Send verification email (optional, non-blocking)
+        try {
+          await sendEmailVerification(userCredential.user);
+        } catch (verifyError) {
+          console.warn('Email verification failed:', verifyError);
+        }
+        
         // Store signup and last login date
         localStorage.setItem('signupDate', new Date().toISOString());
         localStorage.setItem('lastLoginDate', new Date().toISOString());
-        setShowVerifyEmail(true);
-        setLoading(false);
-        return;
+        
+        // Save credentials if remember me is checked
+        if (rememberMe) {
+          localStorage.setItem('userEmail', email);
+          localStorage.setItem('userPassword', password);
+          localStorage.setItem('rememberMe', 'true');
+        }
+        
+        // Auto-login after registration - redirect to home
+        navigate('/');
       }
     } catch (error: any) {
       setError(error.message);

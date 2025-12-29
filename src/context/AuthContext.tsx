@@ -24,11 +24,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUser(user);
+            setUserRole(userData?.role || 'user');
+          } else {
+            // User exists in auth but not in Firestore, set default role
+            setUser(user);
+            setUserRole('user');
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          // Still set the user even if Firestore fetch fails
           setUser(user);
-          setUserRole(userData?.role || 'user');
+          setUserRole('user');
         }
       } else {
         setUser(null);
@@ -38,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [auth]);
 
   return (
     <AuthContext.Provider value={{ user, userRole, loading }}>

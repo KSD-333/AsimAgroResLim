@@ -10,9 +10,40 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
-  const [selectedSize, setSelectedSize] = useState('');
+  // Auto-select the smallest size on mount
+  const getSmallestSize = () => {
+    if (product.priceVariants && product.priceVariants.length > 0) {
+      return product.priceVariants[0].size;
+    }
+    return product.sizes?.[0] || '';
+  };
+
+  const [selectedSize, setSelectedSize] = useState(getSmallestSize());
   const [showToast, setShowToast] = useState(false);
   const { addItem } = useCart();
+
+  // Get price for selected size
+  const getCurrentPrice = () => {
+    if (product.priceVariants && product.priceVariants.length > 0) {
+      const variant = product.priceVariants.find(v => v.size === selectedSize);
+      if (variant) {
+        const price = variant.price || 0;
+        const discount = variant.discount || product.discount || 0;
+        const finalPrice = discount > 0 ? (price * (100 - discount)) / 100 : price;
+        return { price, discount, finalPrice };
+      }
+    }
+    const price = product.price || 0;
+    const discount = product.discount || 0;
+    const discountedPrice = product.discountedPrice || (discount > 0 ? (price * (100 - discount)) / 100 : price);
+    return {
+      price: price,
+      discount: discount,
+      finalPrice: discountedPrice
+    };
+  };
+
+  const priceInfo = getCurrentPrice();
 
   const handleAddToCart = () => {
     if (!selectedSize) {
@@ -24,6 +55,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       name: product.name,
       quantity: 1,
       size: selectedSize,
+      price: priceInfo.finalPrice,
       image: product.imageUrl,
       nutrients: product.nutrients
     });
@@ -35,18 +67,44 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       <div className="card h-full flex flex-col group">
         <div className="relative overflow-hidden">
           <img
-            src={product.imageUrl}
-            alt={product.name}
+            src={product.images?.[0]?.url || product.imageUrl}
+            alt={product.images?.[0]?.alt || product.name}
             className="w-full h-56 object-cover transform transition-transform duration-500 group-hover:scale-105"
           />
           <div className="absolute top-4 right-4 bg-accent-500 text-secondary-800 text-xs font-bold px-2 py-1 rounded">
             {product.category}
           </div>
+          {product.discount > 0 && (
+            <div className="absolute top-4 left-4 bg-red-500 text-white text-sm font-bold px-3 py-1.5 rounded-full shadow-lg">
+              {product.discount}% OFF
+            </div>
+          )}
         </div>
         
         <div className="p-6 flex-1 flex flex-col">
           <h3 className="text-xl font-semibold mb-2 text-primary-900">{product.name}</h3>
           <p className="text-gray-600 mb-4 flex-grow line-clamp-2">{product.description}</p>
+          
+          {/* Price Display */}
+          <div className="mb-4">
+            {priceInfo.discount > 0 ? (
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl font-bold text-green-600">
+                  ₹{priceInfo.finalPrice.toFixed(2)}
+                </span>
+                <span className="text-sm text-gray-400 line-through">
+                  ₹{priceInfo.price.toFixed(2)}
+                </span>
+                <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                  {priceInfo.discount}% OFF
+                </span>
+              </div>
+            ) : (
+              <span className="text-2xl font-bold text-green-600">
+                ₹{priceInfo.finalPrice.toFixed(2)}
+              </span>
+            )}
+          </div>
           
           <div className="mt-2">
             <div className="flex items-center justify-between">
@@ -106,10 +164,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             value={selectedSize}
             onChange={(e) => setSelectedSize(e.target.value)}
           >
-            <option value="" disabled>Select Size</option>
-            {product.sizes?.map((size, index) => (
-              <option key={index} value={size}>{size}</option>
-            ))}
+            {product.priceVariants && product.priceVariants.length > 0 ? (
+              product.priceVariants.map((variant, index) => (
+                <option key={index} value={variant.size}>
+                  {variant.size} - ₹{variant.discount > 0 ? ((variant.price * (100 - variant.discount)) / 100).toFixed(2) : variant.price.toFixed(2)}
+                </option>
+              ))
+            ) : (
+              product.sizes?.map((size, index) => (
+                <option key={index} value={size}>{size}</option>
+              ))
+            )}
           </select>
           <div className="flex space-x-2">
             <Link 

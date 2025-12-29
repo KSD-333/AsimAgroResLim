@@ -1,8 +1,20 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const CallToAction: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleApplyClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      navigate('/login', { state: { from: '/dealers' } });
+    } else {
+      navigate('/dealers');
+    }
+  };
   return (
     <section className="section bg-white relative overflow-hidden">
       <div className="container-custom">
@@ -40,9 +52,13 @@ const CallToAction: React.FC = () => {
               </div>
             </div>
 
-            <Link to="/dealers" className="btn btn-primary">
+            <a 
+              href="/dealers" 
+              onClick={handleApplyClick}
+              className="btn btn-primary"
+            >
               Apply Now
-            </Link>
+            </a>
           </div>
 
           <div className="relative animate-slide-in-right">

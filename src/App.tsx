@@ -33,8 +33,11 @@ function App() {
             <Routes>
               {/* Public Routes */}
               <Route path={"/"} element={<HomePage />} />
+              <Route path={"/home"} element={<HomePage />} />
               <Route path={`/${routeMap.products}`} element={<ProductsPage />} />
+              <Route path={"/product"} element={<ProductsPage />} />
               <Route path={`/${routeMap.products}/:id`} element={<ProductDetailPage />} />
+              <Route path={"/product/:id"} element={<ProductDetailPage />} />
               <Route path={`/${routeMap.about}`} element={<AboutPage />} />
               <Route path={`/${routeMap.contact}`} element={<ContactPage />} />
               <Route path={`/${routeMap.login}`} element={<Login />} />

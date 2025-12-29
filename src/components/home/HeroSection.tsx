@@ -1,8 +1,20 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Sprout, Droplets, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const HeroSection: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleDealerClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      navigate('/login', { state: { from: '/dealers' } });
+    } else {
+      navigate('/dealers');
+    }
+  };
   return (
     <section className="pt-28 pb-16 md:pt-36 md:pb-24 relative overflow-hidden">
       {/* Background Image with Overlay */}
@@ -30,9 +42,13 @@ const HeroSection: React.FC = () => {
               <Link to="/products" className="btn btn-accent font-medium text-base">
                 Explore Products
               </Link>
-              <Link to="/dealers" className="btn btn-outline text-white border-white hover:bg-white/10 focus:ring-white font-medium text-base">
+              <a 
+                href="/dealers" 
+                onClick={handleDealerClick}
+                className="btn btn-outline text-white border-white hover:bg-white/10 focus:ring-white font-medium text-base"
+              >
                 Become a Dealer
-              </Link>
+              </a>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
