@@ -70,6 +70,19 @@ const ContactForm: React.FC<ContactFormProps> = ({ type }) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    
+    // Phone validation - only allow digits and limit to 10
+    if (name === 'phone') {
+      const digitsOnly = value.replace(/\D/g, '');
+      if (digitsOnly.length <= 10) {
+        setFormData(prev => ({
+          ...prev,
+          [name]: digitsOnly
+        }));
+      }
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -121,6 +134,8 @@ const ContactForm: React.FC<ContactFormProps> = ({ type }) => {
               value={formData.email}
               onChange={handleChange}
               required
+              pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+              title="Please enter a valid email address"
               className="w-full px-4 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
@@ -135,6 +150,9 @@ const ContactForm: React.FC<ContactFormProps> = ({ type }) => {
               value={formData.phone}
               onChange={handleChange}
               required
+              pattern="[0-9]{10}"
+              title="Please enter exactly 10 digits"
+              placeholder="10-digit phone number"
               className="w-full px-4 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>

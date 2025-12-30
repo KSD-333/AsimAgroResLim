@@ -27,6 +27,18 @@ const DealerPage: React.FC = () => {
     const { name, value, type } = e.target as HTMLInputElement;
     const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
     
+    // Phone validation - only allow digits and limit to 10
+    if (name === 'phone') {
+      const digitsOnly = value.replace(/\D/g, '');
+      if (digitsOnly.length <= 10) {
+        setFormData(prev => ({
+          ...prev,
+          [name]: digitsOnly
+        }));
+      }
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: val
@@ -365,6 +377,8 @@ const DealerPage: React.FC = () => {
                       value={formData.email}
                       onChange={handleChange}
                       required
+                      pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$"
+                      title="Please enter a valid email address"
                       className="input"
                     />
                   </div>
@@ -380,6 +394,9 @@ const DealerPage: React.FC = () => {
                       value={formData.phone}
                       onChange={handleChange}
                       required
+                      pattern="[0-9]{10}"
+                      title="Please enter exactly 10 digits"
+                      placeholder="10-digit phone number"
                       className="input"
                     />
                   </div>

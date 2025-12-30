@@ -58,10 +58,11 @@ service cloud.firestore {
 
     // Contact forms collection
     match /contactForms/{formId} {
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || 
-        resource.data.userEmail == request.auth.token.email ||
-        isAdmin()
+      allow read: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.userId == request.auth.uid || 
+          resource.data.userEmail == request.auth.token.email
+        )
       );
       allow create: if true;  // Allow anyone to create contact forms
       allow update, delete: if isAdmin();
@@ -69,10 +70,11 @@ service cloud.firestore {
 
     // Legacy contactForm path (keeping for backward compatibility)
     match /contactForm/{formId} {
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || 
-        resource.data.userEmail == request.auth.token.email ||
-        isAdmin()
+      allow read: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.userId == request.auth.uid || 
+          resource.data.userEmail == request.auth.token.email
+        )
       );
       allow create: if true;
       allow update, delete: if isAdmin();

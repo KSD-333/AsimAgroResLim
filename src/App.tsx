@@ -118,14 +118,6 @@ function App() {
                 }
               />
               <Route
-                path={`/${routeMap.adminMessages}`}
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path={`/${routeMap.adminFeedback}`}
                 element={
                   <ProtectedRoute requiredRole="admin">

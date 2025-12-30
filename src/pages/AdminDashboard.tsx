@@ -68,21 +68,9 @@ interface Order {
   adminNotes?: string;
 }
 
-interface OrderMessage {
-  id: string;
-  orderId: string;
-  userId: string;
-  type: 'complaint' | 'return';
-  message: string;
-  status: 'pending' | 'in_progress' | 'resolved';
-  createdAt: any;
-  adminResponse?: string;
-  userName: string;
-}
-
 interface ContactForm {
   id: string;
-  type: 'message' | 'getStarted';
+  type: 'message' | 'getStarted' | 'catalog';
   name: string;
   email: string;
   phone: string;
@@ -156,7 +144,6 @@ const AdminDashboard = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [newDeliveryDate, setNewDeliveryDate] = useState<string>('');
   const [adminNotes, setAdminNotes] = useState<string>('');
-  const [orderMessages, setOrderMessages] = useState<OrderMessage[]>([]);
   const [adminResponse, setAdminResponse] = useState('');
   const [savingResponse, setSavingResponse] = useState(false);
   const [contactForms, setContactForms] = useState<ContactForm[]>([]);
@@ -247,16 +234,6 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchDashboardData();
 
-    // Subscribe to order messages
-    const messagesRef = collection(db, 'orderMessages');
-    const unsubscribe = onSnapshot(messagesRef, (snapshot) => {
-      const messages = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as OrderMessage[];
-      setOrderMessages(messages);
-    });
-
     // Subscribe to contact forms
     const formsRef = collection(db, 'contactForms');
     const unsubscribeForms = onSnapshot(formsRef, (snapshot) => {
@@ -278,7 +255,6 @@ const AdminDashboard = () => {
     });
 
     return () => {
-      unsubscribe();
       unsubscribeForms();
       unsubscribeDealers();
     };
@@ -453,16 +429,6 @@ const AdminDashboard = () => {
     window.location.href = `mailto:${email}`;
   };
 
-  const handleUpdateMessageStatus = async (messageId: string, newStatus: OrderMessage['status']) => {
-    try {
-      await updateDoc(doc(db, 'orderMessages', messageId), {
-        status: newStatus
-      });
-    } catch (error) {
-      console.error('Error updating message status:', error);
-    }
-  };
-
   const handleUpdateFormStatus = async (formId: string, newStatus: ContactForm['status']) => {
     try {
       await updateDoc(doc(db, 'contactForms', formId), {
@@ -525,7 +491,7 @@ const AdminDashboard = () => {
       }
 
       // Get all collections that might have user data
-      const collections = ['orders', 'reviews', 'contactForms', 'orderMessages', 'feedback'];
+      const collections = ['orders', 'reviews', 'contactForms', 'feedback'];
       
       // Delete user data from all collections
       for (const collectionName of collections) {
@@ -771,12 +737,6 @@ const AdminDashboard = () => {
       href: `/${routeMap.adminDealers}`,
       icon: <Users className="h-6 w-6" />,
       color: 'bg-teal-500'
-    },
-    {
-      name: 'Messages',
-      href: `/${routeMap.adminMessages}`,
-      icon: <MessageSquare className="h-6 w-6" />,
-      color: 'bg-pink-500'
     }
   ];
 
@@ -1106,22 +1066,6 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Active Messages</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-2">{orderMessages.filter(m => m.status !== 'resolved').length}</p>
-                  </div>
-                  <div className="bg-pink-100 p-3 rounded-lg">
-                    <MessageSquare className="h-6 w-6 text-pink-600" />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-sm text-gray-600">
-                    {orderMessages.filter(m => m.status === 'pending').length} pending responses
-                  </p>
-                </div>
-              </div>
             </div>
 
             {/* Recent Activity and Statistics */}
@@ -1154,41 +1098,7 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              {/* Recent Messages */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">Recent Messages</h2>
-                  <button
-                    onClick={() => navigate(`/${routeMap.adminMessages}`)}
-                    className="text-sm text-primary-600 hover:text-primary-700"
-                  >
-                    View All
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  {orderMessages.slice(0, 5).map((message) => (
-                    <div key={message.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {message.type === 'complaint' ? 'Complaint' : 'Return Request'}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          From: {message.userName}
-                        </p>
-                      </div>
-                      <div className="flex items-center">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          message.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          message.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {message.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+
             </div>
 
             {/* Additional Statistics */}
@@ -1209,33 +1119,6 @@ const AdminDashboard = () => {
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className={`h-2 rounded-full ${getStatusColor(status)}`}
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Message Type Distribution */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Message Type Distribution</h2>
-                <div className="space-y-4">
-                  {['complaint', 'return'].map((type) => {
-                    const count = orderMessages.filter(message => message.type === type).length;
-                    const percentage = (count / orderMessages.length) * 100 || 0;
-                    return (
-                      <div key={type} className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600 capitalize">{type}</span>
-                          <span className="text-gray-900">{count} messages</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              type === 'complaint' ? 'bg-red-500' : 'bg-blue-500'
-                            }`}
                             style={{ width: `${percentage}%` }}
                           />
                         </div>
@@ -1753,16 +1636,23 @@ const AdminDashboard = () => {
                         <div className="flex items-center space-x-2">
                           {form.type === 'message' ? (
                             <MessageSquare className="h-5 w-5 text-blue-500" />
+                          ) : form.type === 'catalog' ? (
+                            <FileText className="h-5 w-5 text-purple-500" />
                           ) : (
                             <Mail className="h-5 w-5 text-green-500" />
                           )}
                           <h3 className="font-medium text-gray-900">
-                            {form.type === 'message' ? 'Contact Message' : 'Get Started Form'}
+                            {form.type === 'message' ? 'Contact Message' : form.type === 'catalog' ? 'Catalog Request' : 'Get Started Form'}
                           </h3>
                         </div>
                         <p className="text-sm text-gray-600 mt-1">
                           From: {form.name} ({form.email})
                         </p>
+                        {form.phone && (
+                          <p className="text-sm text-gray-600">
+                            Phone: {form.phone}
+                          </p>
+                        )}
                         {form.type === 'getStarted' && (
                           <p className="text-sm text-gray-600">
                             Business: {form.businessType} | Location: {form.location}
@@ -1924,74 +1814,6 @@ const AdminDashboard = () => {
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-          </div>
-        );
-
-      case `/${routeMap.adminMessages}`:
-        return (
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Order Messages</h2>
-            <div className="space-y-4">
-              {orderMessages.length === 0 ? (
-                <p className="text-gray-600">No messages found.</p>
-              ) : (
-                orderMessages.map((message) => (
-                  <div key={message.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          {message.type === 'complaint' ? (
-                            <AlertCircle className="h-5 w-5 text-red-500" />
-                          ) : (
-                            <Package className="h-5 w-5 text-blue-500" />
-                          )}
-                          <h3 className="font-medium text-gray-900">
-                            {message.type === 'complaint' ? 'Complaint' : 'Return Request'}
-                          </h3>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Order #{message.orderId.slice(0, 8)}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          From: {message.userName}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <select
-                          value={message.status}
-                          onChange={(e) => handleUpdateMessageStatus(message.id, e.target.value as OrderMessage['status'])}
-                          className="text-sm border rounded-md px-2 py-1"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="in_progress">In Progress</option>
-                          <option value="resolved">Resolved</option>
-                        </select>
-                        <button
-                          onClick={() => {
-                            setAdminResponse(message.adminResponse || '');
-                          }}
-                          className="px-3 py-1 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
-                        >
-                          Respond
-                        </button>
-                      </div>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded-md">
-                      <p className="text-gray-700">{message.message}</p>
-                    </div>
-                    {message.adminResponse && (
-                      <div className="mt-3 p-3 bg-blue-50 rounded-md">
-                        <p className="text-sm text-gray-600">Admin Response:</p>
-                        <p className="text-gray-700">{message.adminResponse}</p>
-                      </div>
-                    )}
-                    <div className="mt-2 text-sm text-gray-500">
-                      Submitted: {message.createdAt?.toDate().toLocaleDateString('en-GB')}
-                    </div>
-                  </div>
-                ))
               )}
             </div>
           </div>
@@ -2230,7 +2052,7 @@ const AdminDashboard = () => {
         <div className="fixed inset-0 bg-gradient-to-br from-gray-900/60 via-gray-900/50 to-gray-800/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 transform transition-all">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Respond to {selectedForm.type === 'message' ? 'Contact Message' : 'Get Started Form'}
+              Respond to {selectedForm.type === 'message' ? 'Contact Message' : selectedForm.type === 'catalog' ? 'Catalog Request' : 'Get Started Form'}
             </h3>
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-2">Original Message:</p>
