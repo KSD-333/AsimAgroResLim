@@ -26,7 +26,7 @@ const AboutPage: React.FC = () => {
                 Agriculture and farmers are often portrayed as being in crisis today. However, the truth is that when farmers receive the right guidance at the right time and use accurate, effective solutions, nothing can stop them from achieving exceptional yields. With the aim of providing timely advice, precise crop solutions, and direct on-field guidance to rural farmers and young individuals entering agriculture, Aseem Agro Research was established.
               </p>
               <p className="text-gray-700 mb-4">
-                Aseem Agro’s mission is to bring prosperity and satisfaction to both farming and farmers by combining science, technology, and dedicated hard work. Guided by this vision, young entrepreneur Sameer Attar founded the company. With the support of experienced scientists and trained professionals, Aseem Agro has developed a wide range of farmer-friendly products. Backed by real field experience and advanced technology, these products have proven highly effective and are in strong demand. Moving forward, the company remains committed to developing innovative solutions that make agriculture more profitable and sustainable
+                Asim Agro’s mission is to bring prosperity and satisfaction to both farming and farmers by combining science, technology, and dedicated hard work. Guided by this vision, young entrepreneur Sameer Attar founded the company. With the support of experienced scientists and trained professionals, Asim Agro has developed a wide range of farmer-friendly products. Backed by real field experience and advanced technology, these products have proven highly effective and are in strong demand. Moving forward, the company remains committed to developing innovative solutions that make agriculture more profitable and sustainable
               </p>
 
             </div>
@@ -48,7 +48,7 @@ const AboutPage: React.FC = () => {
         <div className="container-custom">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div className="animate-fade-in">
-              <div className="text-4xl font-bold text-white mb-2">15+</div>
+              <div className="text-4xl font-bold text-white mb-2">20+</div>
               <div className="text-primary-100">Years in Business</div>
             </div>
             <div className="animate-fade-in delay-100">
@@ -56,11 +56,11 @@ const AboutPage: React.FC = () => {
               <div className="text-primary-100">Farmers Served</div>
             </div>
             <div className="animate-fade-in delay-200">
-              <div className="text-4xl font-bold text-white mb-2">500+</div>
+              <div className="text-4xl font-bold text-white mb-2">100+</div>
               <div className="text-primary-100">Dealer Network</div>
             </div>
             <div className="animate-fade-in delay-300">
-              <div className="text-4xl font-bold text-white mb-2">20+</div>
+              <div className="text-4xl font-bold text-white mb-2">10+</div>
               <div className="text-primary-100">Product Varieties</div>
             </div>
           </div>
