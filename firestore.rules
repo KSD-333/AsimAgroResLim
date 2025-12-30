@@ -33,7 +33,11 @@ service cloud.firestore {
         isAdmin()
       );
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
     }
 
     // Products collection
@@ -54,21 +58,32 @@ service cloud.firestore {
 
     // Contact forms collection
     match /contactForms/{formId} {
-      allow read: if isAdmin();
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.userEmail == request.auth.token.email ||
+        isAdmin()
+      );
       allow create: if true;  // Allow anyone to create contact forms
       allow update, delete: if isAdmin();
     }
 
     // Legacy contactForm path (keeping for backward compatibility)
     match /contactForm/{formId} {
-      allow read: if isAdmin();
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.userEmail == request.auth.token.email ||
+        isAdmin()
+      );
       allow create: if true;
       allow update, delete: if isAdmin();
     }
 
     // Catalog requests collection
     match /catalogRequest/{requestId} {
-      allow read: if isAdmin();
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
+      );
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
     }
@@ -80,7 +95,11 @@ service cloud.firestore {
         isAdmin()
       );
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
+      );
+      allow delete: if isAdmin();
     }
 
     // Carts collection
@@ -92,6 +111,13 @@ service cloud.firestore {
     match /feedback/{feedbackId} {
       allow read: if isAdmin();
       allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Dealer applications collection
+    match /dealerApplications/{applicationId} {
+      allow read: if isAdmin();
+      allow create: if true;  // Allow anyone to submit dealer applications
       allow update, delete: if isAdmin();
     }
   }

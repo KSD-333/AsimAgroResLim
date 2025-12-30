@@ -106,59 +106,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             )}
           </div>
           
-          <div className="mt-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">NPK Ratio</span>
-              {product.nutrients && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-blue-600">
-                    N: {product.nutrients.nitrogen}%
-                  </span>
-                  <span className="text-sm font-medium text-green-600">
-                    P: {product.nutrients.phosphorus}%
-                  </span>
-                  <span className="text-sm font-medium text-orange-600">
-                    K: {product.nutrients.potassium}%
-                  </span>
-                </div>
-              )}
-            </div>
-            {product.nutrients && (
-              <div className="mt-1 space-y-1">
-                <div className="flex items-center">
-                  <span className="w-8 text-xs text-blue-600">N</span>
-                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-600 rounded-full"
-                      style={{ width: `${product.nutrients.nitrogen}%` }}
-                    />
-                  </div>
-                  <span className="ml-2 text-xs text-gray-600">{product.nutrients.nitrogen}%</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="w-8 text-xs text-green-600">P</span>
-                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-green-600 rounded-full"
-                      style={{ width: `${product.nutrients.phosphorus}%` }}
-                    />
-                  </div>
-                  <span className="ml-2 text-xs text-gray-600">{product.nutrients.phosphorus}%</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="w-8 text-xs text-orange-600">K</span>
-                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-orange-600 rounded-full"
-                      style={{ width: `${product.nutrients.potassium}%` }}
-                    />
-                  </div>
-                  <span className="ml-2 text-xs text-gray-600">{product.nutrients.potassium}%</span>
-                </div>
-              </div>
-            )}
-          </div>
-          
           <select 
             className="form-select bg-white border border-gray-300 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4 w-full"
             value={selectedSize}

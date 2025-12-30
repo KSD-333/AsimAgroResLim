@@ -1,8 +1,7 @@
 // src/pages/AdminDashboard.tsx
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc, query, orderBy, limit, updateDoc, getDoc, setDoc, where, onSnapshot } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { collection, getDocs, deleteDoc, doc, query, orderBy, limit, updateDoc, getDoc, where, onSnapshot, addDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Users, 
@@ -15,18 +14,15 @@ import {
   AlertCircle,
   Plus,
   Trash2,
-  Image as ImageIcon,
   X,
   Mail,
-  CheckCircle,
-  Clock,
-  LayoutDashboard,
   FileText,
   Edit2,
   Upload,
-  Menu
+  Menu,
+  LayoutDashboard,
+  CheckCircle
 } from 'lucide-react';
-import { Timestamp } from 'firebase/firestore';
 import { auth } from '../firebase';
 import { routeMap } from '../routeMap';
 import { useAuth } from '../context/AuthContext';
@@ -101,6 +97,26 @@ interface ContactForm {
   adminResponse?: string;
 }
 
+interface DealerApplication {
+  id: string;
+  businessName: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  yearsInBusiness: string;
+  existingBrands: string;
+  monthlySales: string;
+  businessType: string;
+  comments: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: any;
+  updatedAt?: any;
+}
+
 const AdminDashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -122,7 +138,8 @@ const AdminDashboard = () => {
     stockQuantity: '',
     nitrogen: '',
     phosphorus: '',
-    potassium: ''
+    potassium: '',
+    imageUrl: ''
   });
   const [productImages, setProductImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
@@ -140,7 +157,6 @@ const AdminDashboard = () => {
   const [newDeliveryDate, setNewDeliveryDate] = useState<string>('');
   const [adminNotes, setAdminNotes] = useState<string>('');
   const [orderMessages, setOrderMessages] = useState<OrderMessage[]>([]);
-  const [selectedMessage, setSelectedMessage] = useState<OrderMessage | null>(null);
   const [adminResponse, setAdminResponse] = useState('');
   const [savingResponse, setSavingResponse] = useState(false);
   const [contactForms, setContactForms] = useState<ContactForm[]>([]);
@@ -149,6 +165,10 @@ const AdminDashboard = () => {
   const [isDeletingUser, setIsDeletingUser] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [orderFilter, setOrderFilter] = useState<'all' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'>('all');
+  const [orderSort, setOrderSort] = useState<'date' | 'status'>('date');
+  const [orderUserFilter, setOrderUserFilter] = useState<string>('all');
+  const [dealerApplications, setDealerApplications] = useState<DealerApplication[]>([]);
 
   const fetchDashboardData = async () => {
     try {
@@ -247,9 +267,20 @@ const AdminDashboard = () => {
       setContactForms(forms);
     });
 
+    // Subscribe to dealer applications
+    const dealersRef = collection(db, 'dealerApplications');
+    const unsubscribeDealers = onSnapshot(dealersRef, (snapshot) => {
+      const applications = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as DealerApplication[];
+      setDealerApplications(applications);
+    });
+
     return () => {
       unsubscribe();
       unsubscribeForms();
+      unsubscribeDealers();
     };
   }, []);
 
@@ -282,45 +313,20 @@ const AdminDashboard = () => {
     e.preventDefault();
     setError(null);
 
-    if (productImages.length === 0) {
-      setError('Please upload at least 1 product image');
+    if (!newProduct.imageUrl) {
+      setError('Please provide a product image URL');
       return;
     }
 
-    if (productImages.length > 8) {
-      setError('Maximum 8 images allowed per product');
+    if (priceVariants.length === 0) {
+      setError('Please add at least one size variant with pricing');
       return;
     }
 
     try {
       setLoading(true);
-      setUploadingImages(true);
 
-      // Upload images first
-      const formData = new FormData();
-      productImages.forEach((file) => {
-        formData.append('images', file);
-      });
-
-      const uploadResponse = await fetch('/api/products/upload-images', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${await user?.getIdToken()}`
-        }
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload images');
-      }
-
-      const { data: uploadedImages } = await uploadResponse.json();
-      setUploadingImages(false);
-
-      // Create product with uploaded images
-      const sizesArray = newProduct.sizes.split(',').map(size => size.trim());
-      
-      // Prepare priceVariants if they exist
+      // Prepare priceVariants
       const variantsData = priceVariants
         .filter(v => v.size && v.price)
         .map(v => ({
@@ -333,13 +339,10 @@ const AdminDashboard = () => {
       const productData = {
         name: newProduct.name,
         description: newProduct.description,
-        sizes: variantsData.length > 0 ? variantsData.map(v => v.size) : sizesArray,
+        sizes: variantsData.map(v => v.size),
         category: newProduct.category,
-        price: Number(newProduct.price),
-        discount: Number(newProduct.discount) || 0,
-        stockQuantity: Number(newProduct.stockQuantity),
-        priceVariants: variantsData.length > 0 ? variantsData : undefined,
-        images: uploadedImages,
+        imageUrl: newProduct.imageUrl,
+        priceVariants: variantsData,
         nutrients: {
           nitrogen: newProduct.nitrogen ? Number(newProduct.nitrogen) : 0,
           phosphorus: newProduct.phosphorus ? Number(newProduct.phosphorus) : 0,
@@ -351,24 +354,16 @@ const AdminDashboard = () => {
             name: c.name,
             percentage: Number(c.percentage),
             unit: '%'
-          }))
+          })),
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
       };
 
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await user?.getIdToken()}`
-        },
-        body: JSON.stringify(productData)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create product');
-      }
-
-      const { data: newProductData } = await response.json();
-      setProducts(prevProducts => [...prevProducts, newProductData]);
+      // Save directly to Firebase
+      const docRef = await addDoc(collection(db, 'products'), productData);
+      
+      // Add to local state with the generated ID
+      setProducts(prevProducts => [...prevProducts, { id: docRef.id, ...productData }]);
       
       // Reset form
       setNewProduct({
@@ -381,11 +376,11 @@ const AdminDashboard = () => {
         stockQuantity: '',
         nitrogen: '',
         phosphorus: '',
-        potassium: ''
+        potassium: '',
+        imageUrl: ''
       });
-      setProductImages([]);
-      setImagePreviewUrls([]);
       setCustomChemicals([]);
+      setPriceVariants([]);
       setPriceVariants([]);
       
       setError('Product added successfully!');
@@ -410,27 +405,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const validateImageUrl = (url: string): boolean => {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const handleImageUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const url = e.target.value;
-    setNewProduct({...newProduct, imageUrl: url});
-    
-    if (url && !validateImageUrl(url)) {
-      setError('Please enter a valid URL');
-    } else {
-      setError(null);
-    }
-  };
-
-  const handleUpdateOrderStatus = async (orderId: string, status: Order['status']) => {
+  const handleUpdateOrderStatus = async (orderId: string, status: string) => {
     try {
       await updateDoc(doc(db, 'orders', orderId), {
         status,
@@ -488,24 +463,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleSaveResponse = async () => {
-    if (!selectedMessage || !adminResponse.trim()) return;
-
-    setSavingResponse(true);
-    try {
-      await updateDoc(doc(db, 'orderMessages', selectedMessage.id), {
-        adminResponse: adminResponse.trim(),
-        status: 'resolved'
-      });
-      setSelectedMessage(null);
-      setAdminResponse('');
-    } catch (error) {
-      console.error('Error saving response:', error);
-    } finally {
-      setSavingResponse(false);
-    }
-  };
-
   const handleUpdateFormStatus = async (formId: string, newStatus: ContactForm['status']) => {
     try {
       await updateDoc(doc(db, 'contactForms', formId), {
@@ -523,7 +480,8 @@ const AdminDashboard = () => {
     try {
       await updateDoc(doc(db, 'contactForms', selectedForm.id), {
         adminResponse: adminResponse.trim(),
-        status: 'resolved'
+        status: 'resolved',
+        respondedAt: Timestamp.now()
       });
       setSelectedForm(null);
       setAdminResponse('');
@@ -751,6 +709,32 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleAcceptDealer = async (dealerId: string) => {
+    try {
+      await updateDoc(doc(db, 'dealerApplications', dealerId), {
+        status: 'accepted',
+        updatedAt: Timestamp.now()
+      });
+      alert('Dealer application accepted successfully!');
+    } catch (error) {
+      console.error('Error accepting dealer:', error);
+      alert('Failed to accept dealer application.');
+    }
+  };
+
+  const handleRejectDealer = async (dealerId: string) => {
+    if (!confirm('Are you sure you want to remove this dealer application?')) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'dealerApplications', dealerId));
+      alert('Dealer application removed successfully!');
+    } catch (error) {
+      console.error('Error removing dealer:', error);
+      alert('Failed to remove dealer application.');
+    }
+  };
+
   const quickLinks = [
     {
       name: 'Analytics Overview',
@@ -783,6 +767,12 @@ const AdminDashboard = () => {
       color: 'bg-indigo-500'
     },
     {
+      name: 'Dealers',
+      href: `/${routeMap.adminDealers}`,
+      icon: <Users className="h-6 w-6" />,
+      color: 'bg-teal-500'
+    },
+    {
       name: 'Messages',
       href: `/${routeMap.adminMessages}`,
       icon: <MessageSquare className="h-6 w-6" />,
@@ -790,12 +780,121 @@ const AdminDashboard = () => {
     }
   ];
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'processing':
+        return 'bg-blue-100 text-blue-800';
+      case 'shipped':
+        return 'bg-purple-100 text-purple-800';
+      case 'delivered':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      case 'delayed':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   const renderOrderManagement = () => {
+    const pendingCount = stats.recentOrders.filter(o => o.status === 'pending').length;
+    const processingCount = stats.recentOrders.filter(o => o.status === 'processing').length;
+    const shippedCount = stats.recentOrders.filter(o => o.status === 'shipped').length;
+    const deliveredCount = stats.recentOrders.filter(o => o.status === 'delivered').length;
+    const cancelledCount = stats.recentOrders.filter(o => o.status === 'cancelled').length;
+
+    const filteredOrders = stats.recentOrders
+      .filter(order => {
+        const statusMatch = orderFilter === 'all' || order.status === orderFilter;
+        const userMatch = orderUserFilter === 'all' || order.userEmail === orderUserFilter;
+        return statusMatch && userMatch;
+      })
+      .sort((a, b) => {
+        if (orderSort === 'date') {
+          return b.createdAt?.toDate().getTime() - a.createdAt?.toDate().getTime();
+        } else if (orderSort === 'status') {
+          return a.status.localeCompare(b.status);
+        } else {
+          return a.userEmail.localeCompare(b.userEmail);
+        }
+      });
+
     return (
+      <>
       <div className="bg-white rounded-xl shadow-md p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">Orders Management</h2>
-        <div className="space-y-4">
-          {stats.recentOrders.map((order) => {
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold text-gray-900">Orders Management</h2>
+          <div className="flex items-center space-x-3 flex-wrap gap-2">
+            <select
+              value={orderUserFilter}
+              onChange={(e) => setOrderUserFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+            >
+              <option value="all">All Users</option>
+              {Array.from(new Set(stats.recentOrders.map(o => o.userEmail))).map(email => (
+                <option key={email} value={email}>
+                  {email} ({stats.recentOrders.filter(o => o.userEmail === email).length})
+                </option>
+              ))}
+            </select>
+            <select
+              value={orderFilter}
+              onChange={(e) => setOrderFilter(e.target.value as any)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+            >
+              <option value="all">All Orders ({stats.recentOrders.length})</option>
+              <option value="pending">Pending ({pendingCount})</option>
+              <option value="processing">Processing ({processingCount})</option>
+              <option value="shipped">Shipped ({shippedCount})</option>
+              <option value="delivered">Delivered ({deliveredCount})</option>
+              <option value="cancelled">Cancelled ({cancelledCount})</option>
+            </select>
+            <select
+              value={orderSort}
+              onChange={(e) => setOrderSort(e.target.value as any)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+            >
+              <option value="date">Sort by Date</option>
+              <option value="status">Sort by Status</option>
+              <option value="user">Sort by User</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Order Status Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <p className="text-xs text-yellow-600 font-medium mb-1">Pending</p>
+            <p className="text-2xl font-bold text-yellow-700">{pendingCount}</p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-xs text-blue-600 font-medium mb-1">Processing</p>
+            <p className="text-2xl font-bold text-blue-700">{processingCount}</p>
+          </div>
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+            <p className="text-xs text-purple-600 font-medium mb-1">Shipped</p>
+            <p className="text-2xl font-bold text-purple-700">{shippedCount}</p>
+          </div>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p className="text-xs text-green-600 font-medium mb-1">Delivered</p>
+            <p className="text-2xl font-bold text-green-700">{deliveredCount}</p>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-xs text-red-600 font-medium mb-1">Cancelled</p>
+            <p className="text-2xl font-bold text-red-700">{cancelledCount}</p>
+          </div>
+        </div>
+
+        {filteredOrders.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No orders found for the selected filter.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredOrders.map((order) => {
             // Safely handle timestamps
             const createdAt = order.createdAt?.toDate ? 
               order.createdAt.toDate().toLocaleDateString('en-GB') : 
@@ -873,31 +972,34 @@ const AdminDashboard = () => {
             );
           })}
         </div>
+        )}
+      </div>
 
-        {/* Order Update Modal */}
-        {selectedOrder && (
-          <div className="fixed inset-0 bg-gradient-to-br from-gray-900/60 via-gray-900/50 to-gray-800/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
-            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 transform transition-all">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Update Order #{selectedOrder.id.slice(0, 8)}
-              </h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Order Status
-                  </label>
-                  <select
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    onChange={(e) => handleUpdateOrderStatus(selectedOrder.id, e.target.value as Order['status'])}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="processing">Processing</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="delayed">Delayed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
+      {/* Order Update Modal */}
+      {selectedOrder && (
+        <div className="fixed inset-0 bg-gradient-to-br from-gray-900/60 via-gray-900/50 to-gray-800/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 transform transition-all">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Update Order #{selectedOrder.id.slice(0, 8)}
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Order Status
+                </label>
+                <select
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  value={selectedOrder.status}
+                  onChange={(e) => handleUpdateOrderStatus(selectedOrder.id, e.target.value as any)}
+                >
+                  <option value="pending">Pending</option>
+                  <option value="processing">Processing</option>
+                  <option value="shipped">Shipped</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -942,25 +1044,8 @@ const AdminDashboard = () => {
             </div>
           </div>
         )}
-      </div>
+    </>
     );
-  };
-
-  const getStatusColor = (status: Order['status']) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'processing':
-        return 'bg-blue-100 text-blue-800';
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      case 'delayed':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
   };
 
   const renderContent = () => {
@@ -1357,53 +1442,43 @@ const AdminDashboard = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Price (₹)</label>
-                  <input
-                    type="number"
-                    value={newProduct.price}
-                    onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="e.g., 499"
-                    required
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Discount (%)</label>
-                  <input
-                    type="number"
-                    value={newProduct.discount}
-                    onChange={(e) => setNewProduct({...newProduct, discount: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="e.g., 10"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Stock Quantity</label>
-                  <input
-                    type="number"
-                    value={newProduct.stockQuantity}
-                    onChange={(e) => setNewProduct({...newProduct, stockQuantity: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="e.g., 100"
-                    required
-                    min="0"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Product Image URL <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="url"
+                  value={newProduct.imageUrl || ''}
+                  onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="https://example.com/product-image.jpg"
+                  required
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Enter a direct link to the product image (e.g., from cloud storage or image hosting service)
+                </p>
+                
+                {newProduct.imageUrl && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
+                    <img
+                      src={newProduct.imageUrl}
+                      alt="Product preview"
+                      className="w-64 h-64 object-cover rounded-lg border-2 border-gray-200"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%" y="50%" text-anchor="middle" dominant-baseline="middle"%3EInvalid URL%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Price Variants Section */}
               <div className="border-t pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Size-Based Pricing</h3>
-                    <p className="text-sm text-gray-600">Add different prices for each size variant</p>
+                    <h3 className="text-lg font-semibold text-gray-900">Size-Based Pricing <span className="text-red-500">*</span></h3>
+                    <p className="text-sm text-gray-600">Add at least one size variant with pricing (Required)</p>
                   </div>
                   <button
                     type="button"
@@ -1494,66 +1569,40 @@ const AdminDashboard = () => {
                 )}
                 
                 {priceVariants.length === 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
-                    <p className="mb-2"><strong>Note:</strong> If you don't add size variants, the product will use the default price above for all sizes.</p>
-                    <p>Add size variants to set different prices for each size (e.g., 5kg - ₹500, 10kg - ₹900).</p>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
+                    <p className="mb-2"><strong>Required:</strong> You must add at least one size variant with pricing.</p>
+                    <p>Click "Add Size Variant" to set prices for each size (e.g., 5kg - ₹500, 10kg - ₹900).</p>
                   </div>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Package Sizes (comma-separated) - Optional if using variants <span className="text-xs text-gray-500">(include units)</span>
+                  Product Image URL <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="text"
-                  value={newProduct.sizes}
-                  onChange={(e) => setNewProduct({...newProduct, sizes: e.target.value})}
+                  type="url"
+                  value={newProduct.imageUrl || ''}
+                  onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="e.g., 5kg, 10L, 500ml, 25kg"
-                  required={priceVariants.length === 0}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Product Images (1-8 images required)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleImageSelect}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  disabled={uploadingImages}
+                  placeholder="https://example.com/product-image.jpg"
+                  required
                 />
                 <p className="mt-1 text-sm text-gray-500">
-                  Upload 1-8 high-quality product images. Max 5MB per image.
+                  Enter a direct link to the product image (e.g., from cloud storage or image hosting service)
                 </p>
                 
-                {imagePreviewUrls.length > 0 && (
-                  <div className="mt-4 grid grid-cols-4 gap-4">
-                    {imagePreviewUrls.map((url, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={url}
-                          alt={`Preview ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImage(index)}
-                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                        {index === 0 && (
-                          <span className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                            Primary
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                {newProduct.imageUrl && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Preview:</p>
+                    <img
+                      src={newProduct.imageUrl}
+                      alt="Product preview"
+                      className="w-64 h-64 object-cover rounded-lg border-2 border-gray-200"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%" y="50%" text-anchor="middle" dominant-baseline="middle"%3EInvalid URL%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -1760,6 +1809,126 @@ const AdminDashboard = () => {
           </div>
         );
 
+      case `/${routeMap.adminDealers}`:
+        const pendingDealers = dealerApplications.filter(d => d.status === 'pending');
+        const acceptedDealers = dealerApplications.filter(d => d.status === 'accepted');
+        
+        return (
+          <div className="bg-white rounded-xl shadow-md p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Dealer Applications</h2>
+              <div className="flex items-center space-x-4">
+                <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                  {pendingDealers.length} New
+                </span>
+                <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                  {acceptedDealers.length} Accepted
+                </span>
+              </div>
+            </div>
+
+            {/* Pending Applications */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">New Applications</h3>
+              {pendingDealers.length === 0 ? (
+                <p className="text-gray-600">No pending applications.</p>
+              ) : (
+                <div className="space-y-4">
+                  {pendingDealers.map((dealer) => (
+                    <div key={dealer.id} className="border rounded-lg p-4 bg-yellow-50">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{dealer.businessName}</h4>
+                          <p className="text-sm text-gray-600">Owner: {dealer.ownerName}</p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleAcceptDealer(dealer.id)}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center space-x-1"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            <span>Accept</span>
+                          </button>
+                          <button
+                            onClick={() => handleRejectDealer(dealer.id)}
+                            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center space-x-1"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>Remove</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600">Email: {dealer.email}</p>
+                          <p className="text-gray-600">Phone: {dealer.phone}</p>
+                          <p className="text-gray-600">Business Type: {dealer.businessType}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Location: {dealer.city}, {dealer.state}</p>
+                          <p className="text-gray-600">Years in Business: {dealer.yearsInBusiness}</p>
+                          <p className="text-gray-600">Monthly Sales: {dealer.monthlySales}</p>
+                        </div>
+                      </div>
+                      {dealer.comments && (
+                        <div className="mt-3 p-3 bg-white rounded-md">
+                          <p className="text-sm text-gray-600">Comments:</p>
+                          <p className="text-gray-700">{dealer.comments}</p>
+                        </div>
+                      )}
+                      <div className="mt-2 text-sm text-gray-500">
+                        Submitted: {dealer.createdAt?.toDate().toLocaleDateString('en-GB')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Accepted Dealers */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Accepted Dealers</h3>
+              {acceptedDealers.length === 0 ? (
+                <p className="text-gray-600">No accepted dealers yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  {acceptedDealers.map((dealer) => (
+                    <div key={dealer.id} className="border rounded-lg p-4 bg-green-50">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{dealer.businessName}</h4>
+                          <p className="text-sm text-gray-600">Owner: {dealer.ownerName}</p>
+                        </div>
+                        <button
+                          onClick={() => handleRejectDealer(dealer.id)}
+                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center space-x-1"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-600">Email: {dealer.email}</p>
+                          <p className="text-gray-600">Phone: {dealer.phone}</p>
+                          <p className="text-gray-600">Business Type: {dealer.businessType}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-600">Location: {dealer.city}, {dealer.state}</p>
+                          <p className="text-gray-600">Address: {dealer.address}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-sm text-gray-500">
+                        Accepted: {dealer.updatedAt?.toDate().toLocaleDateString('en-GB')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
       case `/${routeMap.adminMessages}`:
         return (
           <div className="bg-white rounded-xl shadow-md p-6">
@@ -1801,7 +1970,6 @@ const AdminDashboard = () => {
                         </select>
                         <button
                           onClick={() => {
-                            setSelectedMessage(message);
                             setAdminResponse(message.adminResponse || '');
                           }}
                           className="px-3 py-1 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
@@ -2035,6 +2203,14 @@ const AdminDashboard = () => {
                 }`}
               >
                 <FileText className="h-4 w-4 inline mr-2" />Forms
+              </button>
+              <button
+                onClick={() => { navigate(`/${routeMap.adminDealers}`); setIsMobileMenuOpen(false); }}
+                className={`w-full text-left px-4 py-2 rounded-md ${
+                  currentPath === `/${routeMap.adminDealers}` ? 'bg-green-100 text-green-700' : 'hover:bg-gray-100'
+                }`}
+              >
+                <Users className="h-4 w-4 inline mr-2" />Dealers
               </button>
             </div>
           </div>

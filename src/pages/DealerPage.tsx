@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Shield, Users, TrendingUp, MessageSquare, CheckCircle } from 'lucide-react';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const DealerPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -31,29 +33,40 @@ const DealerPage: React.FC = () => {
     }));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted:', formData);
-    setFormSubmitted(true);
-    // Reset form
-    setFormData({
-      businessName: '',
-      ownerName: '',
-      email: '',
-      phone: '',
-      address: '',
-      city: '',
-      state: '',
-      pincode: '',
-      yearsInBusiness: '',
-      existingBrands: '',
-      monthlySales: '',
-      businessType: '',
-      comments: '',
-      agreeTerms: false,
-    });
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      await addDoc(collection(db, 'dealerApplications'), {
+        ...formData,
+        status: 'pending',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      });
+      console.log('Dealer form submitted successfully');
+      setFormSubmitted(true);
+      // Reset form
+      setFormData({
+        businessName: '',
+        ownerName: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+        yearsInBusiness: '',
+        existingBrands: '',
+        monthlySales: '',
+        businessType: '',
+        comments: '',
+        agreeTerms: false,
+      });
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      console.error('Error submitting dealer form:', error);
+      alert('Failed to submit application. Please try again.');
+    }
   };
 
   return (
@@ -277,53 +290,6 @@ const DealerPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      
-      {/* Testimonials */}
-      <section className="section bg-primary-800 text-white">
-        <div className="container-custom">
-          <div className="text-center mb-12 animate-fade-in">
-            <h2 className="text-white mb-4">Hear From Our Dealers</h2>
-            <p className="text-primary-100 max-w-3xl mx-auto">
-              Our dealers share their success stories and experiences partnering with ASIM AGRO.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-primary-700/50 backdrop-blur-sm p-6 rounded-lg animate-slide-up">
-              <MessageSquare className="h-10 w-10 text-accent-400 mb-4" />
-              <blockquote className="text-primary-50 mb-6 italic">
-                "Since becoming an ASIM AGRO dealer, our fertilizer sales have increased by 40%. Their products consistently deliver results, making it easy to build customer loyalty."
-              </blockquote>
-              <div>
-                <p className="font-semibold text-white">Rajesh Sharma</p>
-                <p className="text-primary-200">Sharma Agro Supplies, Pune</p>
-              </div>
-            </div>
-            
-            <div className="bg-primary-700/50 backdrop-blur-sm p-6 rounded-lg animate-slide-up delay-100">
-              <MessageSquare className="h-10 w-10 text-accent-400 mb-4" />
-              <blockquote className="text-primary-50 mb-6 italic">
-                "The marketing support and technical training provided by ASIM AGRO has helped us effectively communicate product benefits to farmers, resulting in repeat business."
-              </blockquote>
-              <div>
-                <p className="font-semibold text-white">Anita Patil</p>
-                <p className="text-primary-200">Krishi Seva Kendra, Nashik</p>
-              </div>
-            </div>
-            
-            <div className="bg-primary-700/50 backdrop-blur-sm p-6 rounded-lg animate-slide-up delay-200">
-              <MessageSquare className="h-10 w-10 text-accent-400 mb-4" />
-              <blockquote className="text-primary-50 mb-6 italic">
-                "The exclusive territory rights have allowed us to establish a strong presence in our region. ASIM AGRO's logistics support ensures we never run out of stock."
-              </blockquote>
-              <div>
-                <p className="font-semibold text-white">Vikram Singh</p>
-                <p className="text-primary-200">Modern Farming Solutions, Kolhapur</p>
               </div>
             </div>
           </div>

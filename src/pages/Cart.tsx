@@ -243,14 +243,14 @@ const Cart: React.FC = () => {
                 )}
                 <div className="flex items-center space-x-2 mt-2">
                   <button
-                    onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
+                    onClick={() => updateQuantity(item.id, item.size, Math.max(0, item.quantity - 1))}
                     className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <Minus className="w-4 h-4" />
                   </button>
                   <span className="w-8 text-center">{item.quantity}</span>
                   <button
-                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                    onClick={() => updateQuantity(item.id, item.size, item.quantity + 1)}
                     className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                   >
                     <Plus className="w-4 h-4" />
@@ -259,7 +259,7 @@ const Cart: React.FC = () => {
               </div>
               <div className="text-right">
                 <button
-                  onClick={() => removeItem(item.id)}
+                  onClick={() => removeItem(item.id, item.size)}
                   className="text-red-500 hover:text-red-700 mt-2 transition-colors"
                 >
                   <Trash2 className="w-5 h-5" />

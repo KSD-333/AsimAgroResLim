@@ -5,6 +5,7 @@ export const routeMap = {
   adminOrders: "admin/orders",
   adminProducts: "admin/products",
   adminForms: "admin/forms",
+  adminDealers: "admin/dealers",
   adminMessages: "admin/messages",
   adminFeedback: "admin/feedback",
   adminProductsNew: "admin/products/new",

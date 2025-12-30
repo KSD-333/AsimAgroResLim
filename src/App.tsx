@@ -110,6 +110,14 @@ function App() {
                 }
               />
               <Route
+                path={`/${routeMap.adminDealers}`}
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path={`/${routeMap.adminMessages}`}
                 element={
                   <ProtectedRoute requiredRole="admin">

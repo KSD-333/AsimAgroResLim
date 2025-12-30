@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Mail, Send, AlertCircle } from 'lucide-react';
+import { Send, AlertCircle } from 'lucide-react';
 
 interface ContactFormProps {
   type: 'message' | 'getStarted';

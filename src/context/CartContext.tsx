@@ -23,7 +23,7 @@ interface Order {
   userId: string;
   userEmail: string;
   items: CartItem[];
-  status: 'pending' | 'processing' | 'delivered' | 'cancelled' | 'delayed';
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'delayed';
   createdAt: Timestamp;
   updatedAt: Timestamp;
   estimatedDeliveryDate: Timestamp;
@@ -38,11 +38,14 @@ interface Order {
   adminNotes?: string;
 }
 
+// Export Order type for use in other files
+export type { Order };
+
 interface CartContextType {
   items: CartItem[];
   addItem: (item: CartItem) => void;
-  removeItem: (itemId: string) => void;
-  updateQuantity: (itemId: string, quantity: number) => void;
+  removeItem: (itemId: string, size: string) => void;
+  updateQuantity: (itemId: string, size: string, quantity: number) => void;
   clearCart: () => void;
   createOrder: (shippingAddress: Order['shippingAddress']) => Promise<string>;
   getOrders: () => Promise<Order[]>;
@@ -118,15 +121,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const removeItem = (itemId: string) => {
-    setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+  const removeItem = (itemId: string, size: string) => {
+    setItems(prevItems => prevItems.filter(item => !(item.id === itemId && item.size === size)));
   };
 
-  const updateQuantity = (itemId: string, quantity: number) => {
+  const updateQuantity = (itemId: string, size: string, quantity: number) => {
     if (quantity < 1) return;
     setItems(prevItems =>
       prevItems.map(item =>
-        item.id === itemId ? { ...item, quantity } : item
+        item.id === itemId && item.size === size ? { ...item, quantity } : item
       )
     );
   };

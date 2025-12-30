@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { Order } from '../context/CartContext';
 import { Mail, Package, Clock, AlertCircle, X, User, MapPin, Save, Edit2, ChevronDown } from 'lucide-react';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { updateProfile } from 'firebase/auth';
 
@@ -56,6 +56,8 @@ const Profile = () => {
   const [orderMessages, setOrderMessages] = useState<OrderMessage[]>([]);
   const [savingMessage, setSavingMessage] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
+  const [contactResponses, setContactResponses] = useState<any[]>([]);
+  const [orderFilter, setOrderFilter] = useState<'all' | Order['status']>('all');
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -106,9 +108,69 @@ const Profile = () => {
       }
     };
 
+    // Set up real-time listener for contact responses
+    let unsubscribeContactResponses: (() => void) | undefined;
+    
+    if (user) {
+      const contactRef = collection(db, 'contactForms');
+      // Query by userId OR userEmail to catch forms submitted before login
+      const q = query(
+        contactRef, 
+        where('userId', '==', user.uid)
+      );
+      
+      unsubscribeContactResponses = onSnapshot(q, (querySnapshot) => {
+        const responses = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        console.log('Contact responses by userId:', responses);
+        console.log('Current user email:', user.email);
+        console.log('Current user uid:', user.uid);
+        
+        // Also fetch by email if userId doesn't match (for forms submitted when not logged in)
+        const contactRefByEmail = collection(db, 'contactForms');
+        const qEmail = query(contactRefByEmail, where('userEmail', '==', user.email));
+        
+        getDocs(qEmail).then((emailSnapshot) => {
+          const emailResponses = emailSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          console.log('Contact responses by email:', emailResponses);
+          
+          // Merge and deduplicate responses
+          const allResponses = [...responses];
+          emailResponses.forEach(emailResp => {
+            if (!allResponses.find(r => r.id === emailResp.id)) {
+              allResponses.push(emailResp);
+            }
+          });
+          
+          console.log('All merged contact responses:', allResponses);
+          setContactResponses(allResponses);
+        }).catch(err => {
+          console.error('Error fetching by email:', err);
+          // If email query fails, at least show userId results
+          setContactResponses(responses);
+        });
+      }, (err) => {
+        console.error('Error loading contact responses:', err);
+      });
+    }
+
     loadUserData();
     loadOrders();
     loadOrderMessages();
+    
+    // Cleanup function
+    return () => {
+      if (unsubscribeContactResponses) {
+        unsubscribeContactResponses();
+      }
+    };
   }, [user, getOrders]);
 
   const validateAddress = (address: ShippingAddress): boolean => {
@@ -192,15 +254,17 @@ const Profile = () => {
 
   const handleCancelOrder = async (orderId: string) => {
     try {
+      console.log('Attempting to cancel order:', orderId);
       await cancelOrder(orderId);
-      setOrders(orders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: 'cancelled' }
-          : order
-      ));
-    } catch (err) {
-      setError('Failed to cancel order');
-      console.error(err);
+      console.log('Order cancelled successfully');
+      
+      // Reload orders to get updated status from database
+      const updatedOrders = await getOrders();
+      setOrders(updatedOrders);
+      setError(null);
+    } catch (err: any) {
+      console.error('Failed to cancel order:', err);
+      setError(err.message || 'Failed to cancel order. Please try again.');
     }
   };
 
@@ -508,9 +572,100 @@ const Profile = () => {
             )}
           </div>
 
+          {/* Contact Form Responses */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Your Messages & Inquiries</h2>
+            {contactResponses.length === 0 ? (
+              <p className="text-gray-600">No messages found.</p>
+            ) : (
+              <div className="space-y-4">
+                {contactResponses.map((response) => {
+                  const createdAt = response.createdAt?.toDate ? 
+                    response.createdAt.toDate().toLocaleDateString('en-GB') : 
+                    'Date not available';
+                  
+                  return (
+                    <div key={response.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {response.type === 'message' ? 'Contact Message' : 'Get Started Request'}
+                          </p>
+                          <p className="text-sm text-gray-600">Submitted on {createdAt}</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          response.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          response.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {response.status?.charAt(0).toUpperCase() + response.status?.slice(1) || 'Pending'}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2 mb-3">
+                        {response.subject && (
+                          <p className="text-sm">
+                            <span className="font-medium text-gray-700">Subject:</span> {response.subject}
+                          </p>
+                        )}
+                        <p className="text-sm">
+                          <span className="font-medium text-gray-700">Message:</span> {response.message}
+                        </p>
+                        {response.businessType && (
+                          <p className="text-sm">
+                            <span className="font-medium text-gray-700">Business Type:</span> {response.businessType}
+                          </p>
+                        )}
+                        {response.location && (
+                          <p className="text-sm">
+                            <span className="font-medium text-gray-700">Location:</span> {response.location}
+                          </p>
+                        )}
+                      </div>
+                      
+                      {response.adminResponse && (
+                        <div className="mt-3 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                          <p className="text-xs text-primary-600 font-medium mb-1">Admin Response:</p>
+                          <p className="text-sm text-gray-700">{response.adminResponse}</p>
+                          {response.respondedAt && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              Responded on {response.respondedAt.toDate().toLocaleDateString('en-GB')}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      
+                      {!response.adminResponse && response.status === 'pending' && (
+                        <p className="mt-3 text-sm text-gray-500 italic">
+                          We'll respond to your inquiry soon.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Order History */}
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Order History</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Order History</h2>
+              <div className="flex items-center space-x-2">
+                <select
+                  value={orderFilter}
+                  onChange={(e) => setOrderFilter(e.target.value as any)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+                >
+                  <option value="all">All Orders ({orders.length})</option>
+                  <option value="pending">Pending ({orders.filter(o => o.status === 'pending').length})</option>
+                  <option value="processing">Processing ({orders.filter(o => o.status === 'processing').length})</option>
+                  <option value="shipped">Shipped ({orders.filter(o => o.status === 'shipped').length})</option>
+                  <option value="delivered">Delivered ({orders.filter(o => o.status === 'delivered').length})</option>
+                  <option value="cancelled">Cancelled ({orders.filter(o => o.status === 'cancelled').length})</option>
+                </select>
+              </div>
+            </div>
             {error && (
               <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-600 rounded-lg">
                 {error}
@@ -520,7 +675,9 @@ const Profile = () => {
               <p className="text-gray-600">No orders found.</p>
             ) : (
               <div className="space-y-6">
-                {orders.map((order) => (
+                {orders
+                  .filter(order => orderFilter === 'all' || order.status === orderFilter)
+                  .map((order) => (
                   <div key={order.id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-4">
                       <div>

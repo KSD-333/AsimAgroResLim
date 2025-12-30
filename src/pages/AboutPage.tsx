@@ -21,16 +21,14 @@ const AboutPage: React.FC = () => {
         <div className="container-custom">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="animate-fade-in">
-              <h2 className="text-primary-900 mb-6">Our Story</h2>
+              <h2 className="text-primary-900 mb-6">About Us</h2>
               <p className="text-gray-700 mb-4">
-                Founded in 2005 in the agricultural heartland of Maharashtra, ASIM AGRO began with a simple mission: to provide farmers with superior quality fertilizers that enhance crop yield while preserving soil health for future generations.
+                Agriculture and farmers are often portrayed as being in crisis today. However, the truth is that when farmers receive the right guidance at the right time and use accurate, effective solutions, nothing can stop them from achieving exceptional yields. With the aim of providing timely advice, precise crop solutions, and direct on-field guidance to rural farmers and young individuals entering agriculture, Aseem Agro Research was established.
               </p>
               <p className="text-gray-700 mb-4">
-                What started as a small manufacturing unit in Kadegoan has grown into one of the region's most trusted agricultural input producers, serving thousands of farmers across multiple states.
+                Aseem Agro’s mission is to bring prosperity and satisfaction to both farming and farmers by combining science, technology, and dedicated hard work. Guided by this vision, young entrepreneur Sameer Attar founded the company. With the support of experienced scientists and trained professionals, Aseem Agro has developed a wide range of farmer-friendly products. Backed by real field experience and advanced technology, these products have proven highly effective and are in strong demand. Moving forward, the company remains committed to developing innovative solutions that make agriculture more profitable and sustainable
               </p>
-              <p className="text-gray-700">
-                Our founder, Mr. Ashok Patil, a former agricultural scientist, established ASIM AGRO based on his extensive research and deep understanding of soil science and plant nutrition. His vision continues to guide our company's commitment to innovation and excellence.
-              </p>
+
             </div>
             <div className="relative animate-slide-up">
               <img
@@ -129,7 +127,7 @@ const AboutPage: React.FC = () => {
               <p className="text-gray-700 mb-4">
                 ASIM AGRO's state-of-the-art manufacturing facility in Kadegoan follows a rigorous production process that emphasizes quality, precision, and environmental responsibility.
               </p>
-              
+
               <div className="space-y-6 mt-8">
                 <div className="flex items-start">
                   <div className="bg-primary-100 text-primary-600 p-2 rounded-full flex-shrink-0 mr-4">
@@ -140,7 +138,7 @@ const AboutPage: React.FC = () => {
                     <p className="text-gray-600">We source the finest raw materials from trusted suppliers, ensuring they meet our stringent quality standards.</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start">
                   <div className="bg-primary-100 text-primary-600 p-2 rounded-full flex-shrink-0 mr-4">
                     <span className="font-semibold">2</span>
@@ -150,7 +148,7 @@ const AboutPage: React.FC = () => {
                     <p className="text-gray-600">Our team utilizes advanced technology to create precise nutrient formulations tailored to different crop requirements.</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start">
                   <div className="bg-primary-100 text-primary-600 p-2 rounded-full flex-shrink-0 mr-4">
                     <span className="font-semibold">3</span>
@@ -160,7 +158,7 @@ const AboutPage: React.FC = () => {
                     <p className="text-gray-600">Every batch undergoes rigorous quality testing in our in-house laboratory to ensure it meets both regulatory standards and our own quality benchmarks.</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start">
                   <div className="bg-primary-100 text-primary-600 p-2 rounded-full flex-shrink-0 mr-4">
                     <span className="font-semibold">4</span>
@@ -176,65 +174,6 @@ const AboutPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Leadership */}
-      <section className="section bg-gray-50">
-        <div className="container-custom">
-          <div className="text-center max-w-3xl mx-auto mb-16 animate-fade-in">
-            <h2 className="text-primary-900 mb-6">Our Leadership</h2>
-            <p className="text-gray-700">
-              Meet the team that drives our vision of agricultural innovation and excellence.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-slide-up">
-            <div className="bg-white rounded-lg overflow-hidden shadow-sm">
-              <img
-                src="https://images.pexels.com/photos/5792641/pexels-photo-5792641.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
-                alt="Ashok Patil - Founder & CEO"
-                className="w-full h-64 object-cover object-center"
-              />
-              <div className="p-6">
-                <h3 className="text-xl font-semibold mb-1 text-primary-900">Ashok Patil</h3>
-                <p className="text-primary-600 mb-4">Founder & CEO</p>
-                <p className="text-gray-700">
-                  Agricultural scientist with 25 years of experience in soil science and plant nutrition research.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg overflow-hidden shadow-sm">
-              <img
-                src="https://images.pexels.com/photos/6632810/pexels-photo-6632810.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
-                alt="Priya Sharma - Technical Director"
-                className="w-full h-64 object-cover object-center"
-              />
-              <div className="p-6">
-                <h3 className="text-xl font-semibold mb-1 text-primary-900">Priya Sharma</h3>
-                <p className="text-primary-600 mb-4">Technical Director</p>
-                <p className="text-gray-700">
-                  Ph.D. in Agricultural Chemistry, leads our research and development efforts.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg overflow-hidden shadow-sm">
-              <img
-                src="https://images.pexels.com/photos/8431885/pexels-photo-8431885.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
-                alt="Rajesh Kumar - Operations Head"
-                className="w-full h-64 object-cover object-center"
-              />
-              <div className="p-6">
-                <h3 className="text-xl font-semibold mb-1 text-primary-900">Rajesh Kumar</h3>
-                <p className="text-primary-600 mb-4">Operations Head</p>
-                <p className="text-gray-700">
-                  MBA with 15 years of experience in agricultural supply chain management.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Location */}
       <section className="section bg-white">
         <div className="container-custom">
@@ -244,7 +183,7 @@ const AboutPage: React.FC = () => {
               <p className="text-gray-700 mb-6">
                 We welcome dealer visits to our manufacturing facility in Kadegoan, where you can witness our production processes and quality control measures firsthand.
               </p>
-              
+
               <div className="flex items-start mb-4">
                 <MapPin className="h-6 w-6 text-primary-600 mt-1 flex-shrink-0" />
                 <div className="ml-4">
@@ -257,7 +196,7 @@ const AboutPage: React.FC = () => {
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-start">
                 <Phone className="h-6 w-6 text-primary-600 mt-1 flex-shrink-0" />
                 <div className="ml-4">

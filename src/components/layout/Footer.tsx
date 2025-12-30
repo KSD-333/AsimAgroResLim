@@ -7,9 +7,9 @@ const Footer: React.FC = () => {
   return (
     <footer className="bg-primary-900 text-white pt-16 pb-8">
       <div className="container-custom">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Company Info */}
-          <div className="col-span-1 md:col-span-1">
+          <div className="col-span-1">
             <div className="flex items-center gap-2 mb-4">
               <Leaf className="h-8 w-8 text-white" />
               <span className="font-display font-bold text-2xl">ASIM AGRO</span>
@@ -89,53 +89,6 @@ const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Products */}
-          <div className="col-span-1">
-            <h3 className="text-xl font-semibold mb-4">Products</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  to={`/${routeMap.products}?category=Macronutrient`}
-                  className="text-primary-100 hover:text-white transition duration-200"
-                >
-                  Macronutrients
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to={`/${routeMap.products}?category=Micronutrient`}
-                  className="text-primary-100 hover:text-white transition duration-200"
-                >
-                  Micronutrients
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to={`/${routeMap.products}?category=Organic`}
-                  className="text-primary-100 hover:text-white transition duration-200"
-                >
-                  Organic Fertilizers
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to={`/${routeMap.products}?category=Specialty`}
-                  className="text-primary-100 hover:text-white transition duration-200"
-                >
-                  Specialty Products
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to={`/${routeMap.products}`}
-                  className="text-primary-100 hover:text-white transition duration-200"
-                >
-                  View All Products
-                </Link>
-              </li>
-            </ul>
-          </div>
-
           {/* Contact Info */}
           <div className="col-span-1">
             <h3 className="text-xl font-semibold mb-4">Contact Us</h3>
@@ -148,7 +101,7 @@ const Footer: React.FC = () => {
               </li>
               <li className="flex items-center space-x-3">
                 <Phone className="h-5 w-5 text-primary-300 flex-shrink-0" />
-                <span className="text-primary-100">+91 1234567890</span>
+                <span className="text-primary-100">+91 7219452502</span>
               </li>
               <li className="flex items-center space-x-3">
                 <Mail className="h-5 w-5 text-primary-300 flex-shrink-0" />
