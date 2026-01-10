@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Cart = require('../models/Cart');
+const { db, admin } = require('../config/firebase');
 const { authenticateUser } = require('../middleware/auth');
 
 // @route   GET /api/cart
@@ -8,15 +8,22 @@ const { authenticateUser } = require('../middleware/auth');
 // @access  Private
 router.get('/', authenticateUser, async (req, res) => {
   try {
-    let cart = await Cart.findOne({ userId: req.dbUser._id })
-      .populate('items.productId', 'name imageUrl price');
+    const cartRef = db.collection('carts').doc(req.user.uid);
+    const cartDoc = await cartRef.get();
 
-    if (!cart) {
-      cart = await Cart.create({
-        userId: req.dbUser._id,
+    let cart;
+    if (!cartDoc.exists) {
+      cart = {
+        userId: req.dbUser.id,
         firebaseUid: req.user.uid,
         items: [],
-      });
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      await cartRef.set(cart);
+      cart = { id: req.user.uid, ...cart };
+    } else {
+      cart = { id: cartDoc.id, ...cartDoc.data() };
     }
 
     res.json({ success: true, data: cart });
@@ -32,27 +39,33 @@ router.post('/items', authenticateUser, async (req, res) => {
   try {
     const { productId, name, quantity, size, price, image, nutrients } = req.body;
 
-    let cart = await Cart.findOne({ userId: req.dbUser._id });
+    const cartRef = db.collection('carts').doc(req.user.uid);
+    const cartDoc = await cartRef.get();
 
-    if (!cart) {
-      cart = await Cart.create({
-        userId: req.dbUser._id,
-        firebaseUid: req.user.uid,
-        items: [],
-      });
+    let items = [];
+    if (cartDoc.exists) {
+      items = cartDoc.data().items || [];
     }
 
-    const existingItemIndex = cart.items.findIndex(
-      item => item.productId.toString() === productId && item.size === size
+    const existingItemIndex = items.findIndex(
+      item => item.productId === productId && item.size === size
     );
 
     if (existingItemIndex > -1) {
-      cart.items[existingItemIndex].quantity += quantity;
+      items[existingItemIndex].quantity += quantity;
     } else {
-      cart.items.push({ productId, name, quantity, size, price, image, nutrients });
+      items.push({ productId, name, quantity, size, price, image, nutrients });
     }
 
-    await cart.save();
+    await cartRef.set({
+      userId: req.dbUser.id,
+      firebaseUid: req.user.uid,
+      items,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    const updatedDoc = await cartRef.get();
+    const cart = { id: updatedDoc.id, ...updatedDoc.data() };
 
     res.json({ success: true, data: cart });
   } catch (error) {
@@ -65,24 +78,33 @@ router.post('/items', authenticateUser, async (req, res) => {
 // @access  Private
 router.put('/items/:productId', authenticateUser, async (req, res) => {
   try {
-    const { quantity } = req.body;
+    const { quantity, size } = req.body;
 
-    const cart = await Cart.findOne({ userId: req.dbUser._id });
+    const cartRef = db.collection('carts').doc(req.user.uid);
+    const cartDoc = await cartRef.get();
 
-    if (!cart) {
+    if (!cartDoc.exists) {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
 
-    const item = cart.items.find(
-      item => item.productId.toString() === req.params.productId
+    const items = cartDoc.data().items || [];
+    const itemIndex = items.findIndex(
+      item => item.productId === req.params.productId && (size ? item.size === size : true)
     );
 
-    if (!item) {
+    if (itemIndex === -1) {
       return res.status(404).json({ success: false, message: 'Item not found in cart' });
     }
 
-    item.quantity = quantity;
-    await cart.save();
+    items[itemIndex].quantity = quantity;
+
+    await cartRef.update({
+      items,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    const updatedDoc = await cartRef.get();
+    const cart = { id: updatedDoc.id, ...updatedDoc.data() };
 
     res.json({ success: true, data: cart });
   } catch (error) {
@@ -95,17 +117,27 @@ router.put('/items/:productId', authenticateUser, async (req, res) => {
 // @access  Private
 router.delete('/items/:productId', authenticateUser, async (req, res) => {
   try {
-    const cart = await Cart.findOne({ userId: req.dbUser._id });
+    const { size } = req.query;
 
-    if (!cart) {
+    const cartRef = db.collection('carts').doc(req.user.uid);
+    const cartDoc = await cartRef.get();
+
+    if (!cartDoc.exists) {
       return res.status(404).json({ success: false, message: 'Cart not found' });
     }
 
-    cart.items = cart.items.filter(
-      item => item.productId.toString() !== req.params.productId
+    let items = cartDoc.data().items || [];
+    items = items.filter(
+      item => !(item.productId === req.params.productId && (size ? item.size === size : true))
     );
 
-    await cart.save();
+    await cartRef.update({
+      items,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    const updatedDoc = await cartRef.get();
+    const cart = { id: updatedDoc.id, ...updatedDoc.data() };
 
     res.json({ success: true, data: cart });
   } catch (error) {
@@ -118,14 +150,15 @@ router.delete('/items/:productId', authenticateUser, async (req, res) => {
 // @access  Private
 router.delete('/', authenticateUser, async (req, res) => {
   try {
-    const cart = await Cart.findOne({ userId: req.dbUser._id });
+    const cartRef = db.collection('carts').doc(req.user.uid);
+    
+    await cartRef.update({
+      items: [],
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
 
-    if (!cart) {
-      return res.status(404).json({ success: false, message: 'Cart not found' });
-    }
-
-    cart.items = [];
-    await cart.save();
+    const updatedDoc = await cartRef.get();
+    const cart = { id: updatedDoc.id, ...updatedDoc.data() };
 
     res.json({ success: true, data: cart });
   } catch (error) {

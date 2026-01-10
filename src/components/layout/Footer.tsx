@@ -96,16 +96,16 @@ const Footer: React.FC = () => {
               <li className="flex items-start space-x-3">
                 <MapPin className="h-5 w-5 text-primary-300 mt-1 flex-shrink-0" />
                 <span className="text-primary-100">
-                  ASIM AGRO Industries, Kadegoan Industrial Area, Maharashtra, India 415304
+                  Plot No. A19 MIDC Kadegaon, Tal - Kadegaon, Dist - Sangli, Maharashtra, Pin Code - 415304
                 </span>
               </li>
               <li className="flex items-center space-x-3">
                 <Phone className="h-5 w-5 text-primary-300 flex-shrink-0" />
-                <span className="text-primary-100">+91 7219452502</span>
+                <span className="text-primary-100">+91 9421132407</span>
               </li>
               <li className="flex items-center space-x-3">
                 <Mail className="h-5 w-5 text-primary-300 flex-shrink-0" />
-                <span className="text-primary-100">info@asimagro.com</span>
+                <span className="text-primary-100">asimagroresearch7@gmail.com</span>
               </li>
             </ul>
           </div>

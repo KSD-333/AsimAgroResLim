@@ -13,7 +13,7 @@ const api = axios.create({
 // Add auth token to requests
 api.interceptors.request.use(
   async (config) => {
-    const { auth } = await import('./firebase');
+    const { auth } = await import('../firebase');
     const token = await auth.currentUser?.getIdToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

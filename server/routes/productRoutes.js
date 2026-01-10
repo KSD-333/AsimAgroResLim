@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Product = require('../models/Product');
+const { db, admin } = require('../config/firebase');
 const { authenticateUser, isAdmin } = require('../middleware/auth');
 const { upload, uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 
@@ -12,43 +12,64 @@ router.get('/', async (req, res) => {
     const { 
       category, 
       search, 
-      sort = '-createdAt', 
+      sort = 'createdAt', 
+      sortDir = 'desc',
       page = 1, 
       limit = 20,
       featured,
-      active = true 
+      active = 'true' 
     } = req.query;
 
-    const query = { isActive: active === 'true' };
+    let query = db.collection('products');
+
+    // Apply filters
+    if (active === 'true') {
+      query = query.where('isActive', '==', true);
+    }
 
     if (category) {
-      query.category = category;
+      query = query.where('category', '==', category);
     }
 
-    if (featured) {
-      query.isFeatured = featured === 'true';
+    if (featured === 'true') {
+      query = query.where('isFeatured', '==', true);
     }
 
+    // Apply sorting
+    query = query.orderBy(sort, sortDir);
+
+    // Get all matching documents for count
+    const allDocs = await query.get();
+    const total = allDocs.size;
+
+    // Apply pagination
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedDocs = allDocs.docs.slice(offset, offset + parseInt(limit));
+
+    const products = paginatedDocs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    // Handle search if provided (client-side filtering for now)
+    let filteredProducts = products;
     if (search) {
-      query.$text = { $search: search };
+      const searchLower = search.toLowerCase();
+      filteredProducts = products.filter(p => 
+        p.name?.toLowerCase().includes(searchLower) ||
+        p.description?.toLowerCase().includes(searchLower) ||
+        p.category?.toLowerCase().includes(searchLower)
+      );
     }
-
-    const products = await Product.find(query)
-      .sort(sort)
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .lean();
-
-    const total = await Product.countDocuments(query);
 
     res.json({
       success: true,
-      data: products,
+      data: filteredProducts,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit)),
+        total: search ? filteredProducts.length : total,
+        pages: Math.ceil((search ? filteredProducts.length : total) / parseInt(limit)),
       },
     });
   } catch (error) {
@@ -61,9 +82,16 @@ router.get('/', async (req, res) => {
 // @access  Public
 router.get('/featured', async (req, res) => {
   try {
-    const products = await Product.find({ isFeatured: true, isActive: true })
+    const productsSnapshot = await db.collection('products')
+      .where('isFeatured', '==', true)
+      .where('isActive', '==', true)
       .limit(3)
-      .lean();
+      .get();
+
+    const products = productsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
     res.json({ success: true, data: products });
   } catch (error) {
@@ -76,15 +104,19 @@ router.get('/featured', async (req, res) => {
 // @access  Public
 router.get('/:id', async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const productRef = db.collection('products').doc(req.params.id);
+    const productDoc = await productRef.get();
 
-    if (!product) {
+    if (!productDoc.exists) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
 
     // Increment views
-    product.views += 1;
-    await product.save();
+    await productRef.update({
+      views: admin.firestore.FieldValue.increment(1)
+    });
+
+    const product = { id: productDoc.id, ...productDoc.data() };
 
     res.json({ success: true, data: product });
   } catch (error) {
@@ -128,7 +160,19 @@ router.post('/upload-images', authenticateUser, isAdmin, upload.array('images', 
 // @access  Private/Admin
 router.post('/', authenticateUser, isAdmin, async (req, res) => {
   try {
-    const product = await Product.create(req.body);
+    const productData = {
+      ...req.body,
+      views: 0,
+      isActive: req.body.isActive !== undefined ? req.body.isActive : true,
+      isFeatured: req.body.isFeatured !== undefined ? req.body.isFeatured : false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const productRef = await db.collection('products').add(productData);
+    const productDoc = await productRef.get();
+    const product = { id: productDoc.id, ...productDoc.data() };
+
     res.status(201).json({ success: true, data: product });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -140,15 +184,21 @@ router.post('/', authenticateUser, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.put('/:id', authenticateUser, isAdmin, async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const productRef = db.collection('products').doc(req.params.id);
+    const productDoc = await productRef.get();
 
-    if (!product) {
+    if (!productDoc.exists) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
+
+    const updateData = {
+      ...req.body,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    await productRef.update(updateData);
+    const updatedDoc = await productRef.get();
+    const product = { id: updatedDoc.id, ...updatedDoc.data() };
 
     res.json({ success: true, data: product });
   } catch (error) {
@@ -161,11 +211,14 @@ router.put('/:id', authenticateUser, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.delete('/:id', authenticateUser, isAdmin, async (req, res) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const productRef = db.collection('products').doc(req.params.id);
+    const productDoc = await productRef.get();
 
-    if (!product) {
+    if (!productDoc.exists) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
+
+    await productRef.delete();
 
     res.json({ success: true, message: 'Product deleted successfully' });
   } catch (error) {

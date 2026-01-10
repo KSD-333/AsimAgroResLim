@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const OrderMessage = require('../models/OrderMessage');
+const { db, admin } = require('../config/firebase');
 const { authenticateUser, isAdmin } = require('../middleware/auth');
 
 // @route   GET /api/messages/user/me
@@ -8,9 +8,15 @@ const { authenticateUser, isAdmin } = require('../middleware/auth');
 // @access  Private
 router.get('/user/me', authenticateUser, async (req, res) => {
   try {
-    const messages = await OrderMessage.find({ userId: req.dbUser._id })
-      .populate('orderId', 'orderNumber')
-      .sort('-createdAt');
+    const messagesSnapshot = await db.collection('orderMessages')
+      .where('firebaseUid', '==', req.user.uid)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const messages = messagesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
     res.json({ success: true, data: messages });
   } catch (error) {
@@ -24,15 +30,21 @@ router.get('/user/me', authenticateUser, async (req, res) => {
 router.get('/', authenticateUser, isAdmin, async (req, res) => {
   try {
     const { status, type } = req.query;
-    const query = {};
     
-    if (status) query.status = status;
-    if (type) query.type = type;
+    let query = db.collection('orderMessages');
+    
+    if (status) {
+      query = query.where('status', '==', status);
+    }
+    if (type) {
+      query = query.where('type', '==', type);
+    }
 
-    const messages = await OrderMessage.find(query)
-      .populate('userId', 'displayName email')
-      .populate('orderId', 'orderNumber')
-      .sort('-createdAt');
+    const messagesSnapshot = await query.orderBy('createdAt', 'desc').get();
+    const messages = messagesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
     res.json({ success: true, data: messages });
   } catch (error) {
@@ -45,13 +57,20 @@ router.get('/', authenticateUser, isAdmin, async (req, res) => {
 // @access  Private
 router.post('/', authenticateUser, async (req, res) => {
   try {
-    const message = await OrderMessage.create({
+    const messageData = {
       ...req.body,
-      userId: req.dbUser._id,
+      userId: req.dbUser.id,
       firebaseUid: req.user.uid,
       userName: req.dbUser.displayName,
       userEmail: req.user.email,
-    });
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const messageRef = await db.collection('orderMessages').add(messageData);
+    const messageDoc = await messageRef.get();
+    const message = { id: messageDoc.id, ...messageDoc.data() };
 
     res.status(201).json({ success: true, data: message });
   } catch (error) {
@@ -59,33 +78,51 @@ router.post('/', authenticateUser, async (req, res) => {
   }
 });
 
-// @route   POST /api/messages/:id/respond
-// @desc    Respond to message
+// @route   PATCH /api/messages/:id/status
+// @desc    Update message status
 // @access  Private/Admin
-router.post('/:id/respond', authenticateUser, isAdmin, async (req, res) => {
+router.patch('/:id/status', authenticateUser, isAdmin, async (req, res) => {
   try {
-    const { response } = req.body;
+    const { status } = req.body;
 
-    const message = await OrderMessage.findByIdAndUpdate(
-      req.params.id,
-      {
-        adminResponse: {
-          comment: response,
-          respondedBy: req.user.uid,
-          respondedAt: new Date(),
-        },
-        status: 'resolved',
-      },
-      { new: true }
-    );
+    const messageRef = db.collection('orderMessages').doc(req.params.id);
+    const messageDoc = await messageRef.get();
 
-    if (!message) {
+    if (!messageDoc.exists) {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
+
+    await messageRef.update({
+      status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    const updatedDoc = await messageRef.get();
+    const message = { id: updatedDoc.id, ...updatedDoc.data() };
 
     res.json({ success: true, data: message });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+// @route   DELETE /api/messages/:id
+// @desc    Delete message
+// @access  Private/Admin
+router.delete('/:id', authenticateUser, isAdmin, async (req, res) => {
+  try {
+    const messageRef = db.collection('orderMessages').doc(req.params.id);
+    const messageDoc = await messageRef.get();
+
+    if (!messageDoc.exists) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    await messageRef.delete();
+
+    res.json({ success: true, message: 'Message deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

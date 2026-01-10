@@ -103,10 +103,10 @@ const ContactPage: React.FC = () => {
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900 mb-1">Head Office</h3>
                     <p className="text-gray-700">
-                      ASIM AGRO Industries<br />
-                      Plot 123, MIDC Industrial Area<br />
-                      Kadegoan, Maharashtra 415304<br />
-                      India
+                      Asim Agro Research<br />
+                      Plot No. A19 MIDC Kadegaon<br />
+                      Tal - Kadegaon, Dist - Sangli<br />
+                      Maharashtra, Pin Code - 415304
                     </p>
                   </div>
                 </div>
@@ -118,9 +118,7 @@ const ContactPage: React.FC = () => {
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900 mb-1">Phone</h3>
                     <p className="text-gray-700">
-                      General Inquiries: +91 1234567890<br />
-                      Dealer Support: +91 9876543210<br />
-                      Technical Support: +91 8765432109
+                      Contact: +91 9421132407
                     </p>
                   </div>
                 </div>
@@ -132,9 +130,7 @@ const ContactPage: React.FC = () => {
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900 mb-1">Email</h3>
                     <p className="text-gray-700">
-                      General: info@asimagro.com<br />
-                      Sales: sales@asimagro.com<br />
-                      Support: support@asimagro.com
+                      asimagroresearch7@gmail.com
                     </p>
                   </div>
                 </div>
@@ -146,9 +142,8 @@ const ContactPage: React.FC = () => {
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900 mb-1">Business Hours</h3>
                     <p className="text-gray-700">
-                      Monday - Friday: 9:00 AM - 6:00 PM<br />
-                      Saturday: 9:00 AM - 1:00 PM<br />
-                      Sunday: Closed
+                      Monday - Sunday: 9:00 AM - 6:00 PM<br />
+                      
                     </p>
                   </div>
                 </div>
@@ -178,13 +173,7 @@ const ContactPage: React.FC = () => {
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"></path></svg>
                   </a>
-                  <a
-                    href="#"
-                    className="bg-blue-800 text-white hover:bg-blue-900 transition duration-300 h-10 w-10 rounded-full flex items-center justify-center"
-                    aria-label="LinkedIn"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
-                  </a>
+                
                 </div>
               </div>
             </div>
@@ -312,42 +301,7 @@ const ContactPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Dealer Locations */}
-      <section className="section bg-gray-50">
-        <div className="container-custom">
-          <div className="text-center mb-12 animate-fade-in">
-            <h2 className="text-primary-900 mb-4">Our Dealer Network</h2>
-            <p className="text-gray-600 max-w-3xl mx-auto">
-              Find ASIM AGRO products at our authorized dealer locations across the region.
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-up">
-            {dealerLocations.map(dealer => (
-              <div key={dealer.id} className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition duration-300">
-                <h3 className="text-xl font-semibold text-primary-900 mb-2">{dealer.name}</h3>
-                <p className="text-gray-600 mb-4">
-                  {dealer.address}, {dealer.city}, {dealer.state}
-                </p>
-                <div className="flex items-center text-gray-700 mb-2">
-                  <Phone className="h-4 w-4 mr-2 text-primary-600" />
-                  <span>{dealer.phone}</span>
-                </div>
-                <div className="flex items-center text-gray-700">
-                  <Mail className="h-4 w-4 mr-2 text-primary-600" />
-                  <span>{dealer.email}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <div className="text-center mt-8">
-            <p className="text-gray-600">
-              Can't find a dealer near you? <a href="#" className="text-primary-600 hover:text-primary-700">Contact us</a> for assistance.
-            </p>
-          </div>
-        </div>
-      </section>
+      
     </div>
   );
 };

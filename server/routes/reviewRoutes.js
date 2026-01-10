@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Review = require('../models/Review');
-const Product = require('../models/Product');
+const { db, admin } = require('../config/firebase');
 const { authenticateUser } = require('../middleware/auth');
 
 // @route   GET /api/reviews/product/:productId
@@ -9,12 +8,16 @@ const { authenticateUser } = require('../middleware/auth');
 // @access  Public
 router.get('/product/:productId', async (req, res) => {
   try {
-    const reviews = await Review.find({ 
-      productId: req.params.productId,
-      isApproved: true 
-    })
-      .populate('userId', 'displayName')
-      .sort('-createdAt');
+    const reviewsSnapshot = await db.collection('reviews')
+      .where('productId', '==', req.params.productId)
+      .where('isApproved', '==', true)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const reviews = reviewsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
     res.json({ success: true, data: reviews });
   } catch (error) {
@@ -30,37 +33,50 @@ router.post('/', authenticateUser, async (req, res) => {
     const { productId, rating, comment, images } = req.body;
 
     // Check if user already reviewed this product
-    const existingReview = await Review.findOne({
-      productId,
-      userId: req.dbUser._id,
-    });
+    const existingReviewSnapshot = await db.collection('reviews')
+      .where('productId', '==', productId)
+      .where('firebaseUid', '==', req.user.uid)
+      .limit(1)
+      .get();
 
-    if (existingReview) {
+    if (!existingReviewSnapshot.empty) {
       return res.status(400).json({ 
         success: false, 
         message: 'You have already reviewed this product' 
       });
     }
 
-    const review = await Review.create({
+    const reviewData = {
       productId,
-      userId: req.dbUser._id,
+      userId: req.dbUser.id,
       firebaseUid: req.user.uid,
       userName: req.dbUser.displayName,
       rating,
       comment,
       images: images || [],
-    });
+      isApproved: true,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const reviewRef = await db.collection('reviews').add(reviewData);
+    const reviewDoc = await reviewRef.get();
 
     // Update product rating
-    const reviews = await Review.find({ productId });
-    const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+    const allReviewsSnapshot = await db.collection('reviews')
+      .where('productId', '==', productId)
+      .get();
     
-    await Product.findByIdAndUpdate(productId, {
+    const totalRating = allReviewsSnapshot.docs.reduce((sum, doc) => sum + doc.data().rating, 0);
+    const avgRating = totalRating / allReviewsSnapshot.size;
+
+    const productRef = db.collection('products').doc(productId);
+    await productRef.update({
       'rating.average': avgRating,
-      'rating.count': reviews.length,
+      'rating.count': allReviewsSnapshot.size
     });
 
+    const review = { id: reviewDoc.id, ...reviewDoc.data() };
     res.status(201).json({ success: true, data: review });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -72,27 +88,33 @@ router.post('/', authenticateUser, async (req, res) => {
 // @access  Private
 router.delete('/:id', authenticateUser, async (req, res) => {
   try {
-    const review = await Review.findById(req.params.id);
+    const reviewRef = db.collection('reviews').doc(req.params.id);
+    const reviewDoc = await reviewRef.get();
 
-    if (!review) {
+    if (!reviewDoc.exists) {
       return res.status(404).json({ success: false, message: 'Review not found' });
     }
 
-    if (review.userId.toString() !== req.dbUser._id.toString() && req.dbUser.role !== 'admin') {
+    const reviewData = reviewDoc.data();
+
+    if (reviewData.firebaseUid !== req.user.uid && req.dbUser.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    await review.deleteOne();
+    await reviewRef.delete();
 
     // Update product rating
-    const reviews = await Review.find({ productId: review.productId });
-    const avgRating = reviews.length > 0 
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
-      : 0;
+    const allReviewsSnapshot = await db.collection('reviews')
+      .where('productId', '==', reviewData.productId)
+      .get();
     
-    await Product.findByIdAndUpdate(review.productId, {
+    const avgRating = allReviewsSnapshot.empty ? 0 : 
+      allReviewsSnapshot.docs.reduce((sum, doc) => sum + doc.data().rating, 0) / allReviewsSnapshot.size;
+
+    const productRef = db.collection('products').doc(reviewData.productId);
+    await productRef.update({
       'rating.average': avgRating,
-      'rating.count': reviews.length,
+      'rating.count': allReviewsSnapshot.size
     });
 
     res.json({ success: true, message: 'Review deleted successfully' });

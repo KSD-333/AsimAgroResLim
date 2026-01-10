@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
+const { db } = require('../config/firebase');
 const { authenticateUser, isAdmin } = require('../middleware/auth');
 
 // @route   GET /api/users/profile
@@ -21,11 +21,15 @@ router.put('/profile', authenticateUser, async (req, res) => {
   try {
     const { displayName, preferences } = req.body;
     
-    const user = await User.findByIdAndUpdate(
-      req.dbUser._id,
-      { displayName, preferences },
-      { new: true, runValidators: true }
-    );
+    const userRef = db.collection('users').doc(req.dbUser.id);
+    await userRef.update({
+      displayName,
+      preferences,
+      updatedAt: db.FieldValue.serverTimestamp()
+    });
+
+    const userDoc = await userRef.get();
+    const user = { id: userDoc.id, ...userDoc.data() };
 
     res.json({ success: true, data: user });
   } catch (error) {
@@ -38,11 +42,14 @@ router.put('/profile', authenticateUser, async (req, res) => {
 // @access  Private
 router.put('/shipping-address', authenticateUser, async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(
-      req.dbUser._id,
-      { shippingAddress: req.body },
-      { new: true, runValidators: true }
-    );
+    const userRef = db.collection('users').doc(req.dbUser.id);
+    await userRef.update({
+      shippingAddress: req.body,
+      updatedAt: db.FieldValue.serverTimestamp()
+    });
+
+    const userDoc = await userRef.get();
+    const user = { id: userDoc.id, ...userDoc.data() };
 
     res.json({ success: true, data: user });
   } catch (error) {
@@ -55,7 +62,15 @@ router.put('/shipping-address', authenticateUser, async (req, res) => {
 // @access  Private/Admin
 router.get('/', authenticateUser, isAdmin, async (req, res) => {
   try {
-    const users = await User.find().select('-__v').sort('-createdAt');
+    const usersSnapshot = await db.collection('users')
+      .orderBy('createdAt', 'desc')
+      .get();
+    
+    const users = usersSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
     res.json({ success: true, data: users });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -67,11 +82,14 @@ router.get('/', authenticateUser, isAdmin, async (req, res) => {
 // @access  Private/Admin
 router.delete('/:id', authenticateUser, isAdmin, async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const userRef = db.collection('users').doc(req.params.id);
+    const userDoc = await userRef.get();
 
-    if (!user) {
+    if (!userDoc.exists) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
+    await userRef.delete();
 
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {

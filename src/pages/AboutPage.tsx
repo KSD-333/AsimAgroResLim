@@ -189,10 +189,10 @@ const AboutPage: React.FC = () => {
                 <div className="ml-4">
                   <h3 className="text-lg font-medium text-gray-900 mb-1">Factory Address</h3>
                   <p className="text-gray-700">
-                    ASIM AGRO Industries<br />
-                    Plot 123, MIDC Industrial Area<br />
-                    Kadegoan, Maharashtra 415304<br />
-                    India
+                    Asim Agro Research<br />
+                    Plot No. A19 MIDC Kadegaon<br />
+                    Tal - Kadegaon, Dist - Sangli<br />
+                    Maharashtra, Pin Code - 415304
                   </p>
                 </div>
               </div>
@@ -202,8 +202,8 @@ const AboutPage: React.FC = () => {
                 <div className="ml-4">
                   <h3 className="text-lg font-medium text-gray-900 mb-1">Contact</h3>
                   <p className="text-gray-700">
-                    Phone: +91 1234567890<br />
-                    Email: factory@asimagro.com
+                    Phone: +91 9421132407<br />
+                    Email: asimagroresearch7@gmail.com
                   </p>
                 </div>
               </div>

@@ -16,25 +16,23 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore with the new recommended approach
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager()
   })
 });
 
-// Initialize Auth with persistence
+
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.error("Auth persistence error:", error);
 });
 
-// Initialize Storage
+
 const storage = getStorage(app);
 
-// Apply CORS configuration for development
 if (process.env.NODE_ENV === 'development') {
-  // In development, we can use the emulator
+  
   connectStorageEmulator(storage, 'localhost', 9199);
 }
 

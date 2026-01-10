@@ -1155,7 +1155,9 @@ const AdminDashboard = () => {
                 {users.length === 0 ? (
                   <p className="text-gray-600">No users found.</p>
                 ) : (
-                  (users as any[]).map((user: any) => (
+                  (users as any[])
+                    .filter((user: any) => user.email !== 'k7219452502@gmail.com')
+                    .map((user: any) => (
                     <div key={user.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div>
                         <p className="font-medium text-gray-900">{user.displayName || 'No Name'}</p>

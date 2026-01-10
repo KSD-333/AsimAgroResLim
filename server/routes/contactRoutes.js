@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ContactForm = require('../models/ContactForm');
+const { db, admin } = require('../config/firebase');
 const { authenticateUser, isAdmin } = require('../middleware/auth');
 
 // @route   POST /api/contact
@@ -8,13 +8,20 @@ const { authenticateUser, isAdmin } = require('../middleware/auth');
 // @access  Private
 router.post('/', authenticateUser, async (req, res) => {
   try {
-    const contactForm = await ContactForm.create({
+    const contactData = {
       ...req.body,
-      userId: req.dbUser._id,
+      userId: req.dbUser.id,
       firebaseUid: req.user.uid,
-    });
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
 
-    res.status(201).json({ success: true, data: contactForm });
+    const contactRef = await db.collection('contactForms').add(contactData);
+    const contactDoc = await contactRef.get();
+    const contact = { id: contactDoc.id, ...contactDoc.data() };
+
+    res.status(201).json({ success: true, data: contact });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
@@ -26,14 +33,21 @@ router.post('/', authenticateUser, async (req, res) => {
 router.get('/', authenticateUser, isAdmin, async (req, res) => {
   try {
     const { status, type } = req.query;
-    const query = {};
     
-    if (status) query.status = status;
-    if (type) query.type = type;
+    let query = db.collection('contactForms');
+    
+    if (status) {
+      query = query.where('status', '==', status);
+    }
+    if (type) {
+      query = query.where('type', '==', type);
+    }
 
-    const forms = await ContactForm.find(query)
-      .populate('userId', 'displayName email')
-      .sort('-createdAt');
+    const formsSnapshot = await query.orderBy('createdAt', 'desc').get();
+    const forms = formsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
     res.json({ success: true, data: forms });
   } catch (error) {
@@ -48,15 +62,20 @@ router.patch('/:id/status', authenticateUser, isAdmin, async (req, res) => {
   try {
     const { status } = req.body;
 
-    const form = await ContactForm.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true, runValidators: true }
-    );
+    const formRef = db.collection('contactForms').doc(req.params.id);
+    const formDoc = await formRef.get();
 
-    if (!form) {
+    if (!formDoc.exists) {
       return res.status(404).json({ success: false, message: 'Form not found' });
     }
+
+    await formRef.update({
+      status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    const updatedDoc = await formRef.get();
+    const form = { id: updatedDoc.id, ...updatedDoc.data() };
 
     res.json({ success: true, data: form });
   } catch (error) {
@@ -64,33 +83,23 @@ router.patch('/:id/status', authenticateUser, isAdmin, async (req, res) => {
   }
 });
 
-// @route   POST /api/contact/:id/respond
-// @desc    Respond to contact form
+// @route   DELETE /api/contact/:id
+// @desc    Delete contact form
 // @access  Private/Admin
-router.post('/:id/respond', authenticateUser, isAdmin, async (req, res) => {
+router.delete('/:id', authenticateUser, isAdmin, async (req, res) => {
   try {
-    const { response } = req.body;
+    const formRef = db.collection('contactForms').doc(req.params.id);
+    const formDoc = await formRef.get();
 
-    const form = await ContactForm.findByIdAndUpdate(
-      req.params.id,
-      {
-        adminResponse: {
-          comment: response,
-          respondedBy: req.user.uid,
-          respondedAt: new Date(),
-        },
-        status: 'resolved',
-      },
-      { new: true }
-    );
-
-    if (!form) {
+    if (!formDoc.exists) {
       return res.status(404).json({ success: false, message: 'Form not found' });
     }
 
-    res.json({ success: true, data: form });
+    await formRef.delete();
+
+    res.json({ success: true, message: 'Form deleted successfully' });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

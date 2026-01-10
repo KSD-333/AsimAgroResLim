@@ -1,41 +1,8 @@
-const admin = require('firebase-admin');
-
-// Initialize Firebase Admin
-if (!admin.apps.length) {
-  try {
-    const config = {
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    };
-
-    // Only initialize if credentials are provided
-    if (config.projectId && config.privateKey && config.clientEmail) {
-      admin.initializeApp({
-        credential: admin.credential.cert(config),
-      });
-      console.log('✅ Firebase Admin initialized');
-    } else {
-      console.warn('⚠️  Firebase Admin credentials not found. Auth middleware will be disabled.');
-    }
-  } catch (error) {
-    console.error('❌ Firebase Admin initialization failed:', error.message);
-  }
-}
-
-const User = require('../models/User');
+const { admin, db } = require('../config/firebase');
 
 // Authenticate user via Firebase token
 const authenticateUser = async (req, res, next) => {
   try {
-    // Skip auth if Firebase Admin is not initialized (development mode)
-    if (!admin.apps.length) {
-      console.warn('⚠️  Auth middleware skipped - Firebase Admin not initialized');
-      req.user = { uid: 'dev-user', email: 'dev@example.com' };
-      req.dbUser = { _id: 'dev-user-id', role: 'admin' };
-      return next();
-    }
-
     const token = req.headers.authorization?.split('Bearer ')[1];
 
     if (!token) {
@@ -45,18 +12,35 @@ const authenticateUser = async (req, res, next) => {
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.user = decodedToken;
 
-    // Get or create user in MongoDB
-    let user = await User.findOne({ firebaseUid: decodedToken.uid });
+    // Get or create user in Firestore
+    const userRef = db.collection('users').doc(decodedToken.uid);
+    const userDoc = await userRef.get();
 
-    if (!user) {
-      user = await User.create({
+    if (!userDoc.exists) {
+      const newUser = {
         firebaseUid: decodedToken.uid,
         email: decodedToken.email,
         displayName: decodedToken.name || decodedToken.email?.split('@')[0],
+        role: 'user',
+        isActive: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+        preferences: {
+          newsletter: false,
+          notifications: true
+        }
+      };
+      await userRef.set(newUser);
+      req.dbUser = { id: decodedToken.uid, ...newUser };
+    } else {
+      // Update last login
+      await userRef.update({ 
+        lastLogin: admin.firestore.FieldValue.serverTimestamp() 
       });
+      req.dbUser = { id: userDoc.id, ...userDoc.data() };
     }
 
-    req.dbUser = user;
     next();
   } catch (error) {
     console.error('Auth error:', error);
