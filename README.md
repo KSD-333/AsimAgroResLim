@@ -1,6 +1,6 @@
-# Asim Agro 🌾
+# Asim Agro Research 🌾
 
-Asim Agro is a modern e-commerce web application built with **React** and **Vite**, designed specifically for agricultural products. It provides seamless experiences for both users and admins with real-time functionalities powered by **Firebase**.
+Asim Agro Research is a modern e-commerce web application built with **React** and **Vite**, designed specifically for agricultural products. It provides seamless experiences for both users and admins with real-time functionalities powered by **Firebase**.
 
 ## 🔥 Features
 

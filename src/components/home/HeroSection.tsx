@@ -92,20 +92,20 @@ const HeroSection: React.FC = () => {
               <span className="text-accent-400">Enriching Soil</span>
             </h1>
             <p className="text-primary-50 text-lg md:text-xl mb-8 max-w-2xl">
-              ASIM AGRO delivers premium-quality fertilizers, designed to maximize crop yield and enhance soil health for sustainable farming.
+              Asim Agro Research delivers premium-quality fertilizers, designed to maximize crop yield and enhance soil health for sustainable farming.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-12">
               <Link to="/products" className="btn btn-accent font-medium text-base">
                 Explore Products
               </Link>
-              <a 
+              {/* <a 
                 href="/dealers" 
                 onClick={handleDealerClick}
                 className="btn btn-outline text-white border-white hover:bg-white/10 focus:ring-white font-medium text-base"
               >
                 Become a Dealer
-              </a>
+              </a> */}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">

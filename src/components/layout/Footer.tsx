@@ -15,7 +15,7 @@ const Footer: React.FC = () => {
               <span className="font-display font-bold text-2xl">ASIM AGRO</span>
             </div>
             <p className="text-primary-100 mb-6">
-              Premium fertilizers for enhanced crop yield. Supporting farmers across India with quality agricultural inputs since 2005.
+              Premium fertilizers for enhanced crop yield. Supporting farmers across India with quality agricultural inputs since 2011.
             </p>
             <div className="flex space-x-4">
               <a
@@ -79,12 +79,12 @@ const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link
+                {/* <Link
                   to={`/${routeMap.dealers}`}
                   className="text-primary-100 hover:text-white transition duration-200"
                 >
                   Become a Dealer
-                </Link>
+                </Link> */}
               </li>
             </ul>
           </div>

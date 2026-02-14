@@ -39,8 +39,8 @@ const TestimonialSection: React.FC = () => {
       <div className="container-custom relative z-10">
         <div className="text-center mb-12 animate-fade-in">
           <h2 className="text-white mb-4">What Our Dealers Say</h2>
-          <p className="text-primary-100 max-w-3xl mx-auto">
-            We take pride in the relationships we've built with our dealers across the country. Here's what they have to say about their experience with ASIM AGRO.
+            <p className="text-primary-100 max-w-3xl mx-auto">
+            We take pride in the relationships we've built with our dealers across the country. Here's what they have to say about their experience with Asim Agro Research.
           </p>
         </div>
 

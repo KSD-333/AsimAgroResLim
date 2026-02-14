@@ -1,4 +1,4 @@
-# Firebase Setup Guide for Asim Agro
+# Firebase Setup Guide for Asim Agro Research
 
 ## Overview
 This application now uses Firebase Firestore as the database instead of MongoDB.

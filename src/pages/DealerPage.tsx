@@ -97,7 +97,7 @@ const DealerPage: React.FC = () => {
         
         <div className="container-custom relative z-10">
           <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-white mb-6">Become an ASIM AGRO Dealer</h1>
+            <h1 className="text-white mb-6">Become an Asim Agro Research Dealer</h1>
             <p className="text-primary-100 text-lg">
               Join our network of successful dealers and grow your business with our premium fertilizer products.
             </p>
@@ -111,7 +111,7 @@ const DealerPage: React.FC = () => {
           <div className="text-center mb-16 animate-fade-in">
             <h2 className="text-primary-900 mb-4">Why Partner With Us</h2>
             <p className="text-gray-600 max-w-3xl mx-auto">
-              As an ASIM AGRO dealer, you'll gain access to premium products, exclusive territory rights, and comprehensive support to help your business thrive.
+              As an Asim Agro Research dealer, you'll gain access to premium products, exclusive territory rights, and comprehensive support to help your business thrive.
             </p>
           </div>
           
@@ -325,7 +325,7 @@ const DealerPage: React.FC = () => {
                 <div>
                   <h3 className="font-medium text-lg mb-2">Application Submitted Successfully!</h3>
                   <p>
-                    Thank you for your interest in becoming an ASIM AGRO dealer. Our team will review your application and contact you within 2-3 business days to discuss the next steps.
+                    Thank you for your interest in becoming an Asim Agro Research dealer. Our team will review your application and contact you within 2-3 business days to discuss the next steps.
                   </p>
                 </div>
               </div>
@@ -561,7 +561,7 @@ const DealerPage: React.FC = () => {
                       value={formData.comments}
                       onChange={handleChange}
                       className="input"
-                      placeholder="Tell us more about your business and why you're interested in becoming an ASIM AGRO dealer"
+                      placeholder="Tell us more about your business and why you're interested in becoming an Asim Agro Research dealer"
                     ></textarea>
                   </div>
                 </div>
@@ -582,7 +582,7 @@ const DealerPage: React.FC = () => {
                   </div>
                   <div className="ml-3 text-sm">
                     <label htmlFor="agreeTerms" className="text-gray-700">
-                      I agree to the ASIM AGRO dealership terms and conditions. I confirm that all information provided is accurate and complete.
+                      I agree to the Asim Agro Research dealership terms and conditions. I confirm that all information provided is accurate and complete.
                     </label>
                   </div>
                 </div>

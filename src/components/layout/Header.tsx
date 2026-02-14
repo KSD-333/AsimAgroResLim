@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ShoppingCart, User, Leaf, LogOut, LayoutDashboard } from 'lucide-react';
+import { Menu, X, ShoppingCart, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { getAuth, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -93,8 +93,8 @@ const Header: React.FC<HeaderProps> = ({ user, userRole }) => {
     { name: 'Home', path: `/${routeMap.home}` },
     { name: 'Products', path: `/${routeMap.products}` },
     { name: 'About Us', path: `/${routeMap.about}` },
-    { name: 'Contact', path: `/${routeMap.contact}` },
-    { name: 'Become a Dealer', path: `/${routeMap.dealers}` }
+    { name: 'Contact', path: `/${routeMap.contact}` }
+    // { name: 'Become a Dealer', path: `/${routeMap.dealers}` }
   ];
 
   return (
@@ -107,8 +107,12 @@ const Header: React.FC<HeaderProps> = ({ user, userRole }) => {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            <Leaf className={`h-8 w-8 transition-colors ${isScrolled ? 'text-primary-600' : 'text-white'}`} />
-            <span className={`text-xl font-bold transition-colors ${isScrolled ? 'text-primary-900' : 'text-white'}`}>ASIM AGRO</span>
+            <img
+              src="/logo.png"
+              alt="Asim Agro Research logo"
+              className="h-12 w-auto object-contain"
+            />
+            <span className={`text-xl font-bold transition-colors ${isScrolled ? 'text-primary-900' : 'text-white'}`}>ASIM AGRO RESEARCH</span>
           </Link>
 
           {/* Desktop Navigation */}

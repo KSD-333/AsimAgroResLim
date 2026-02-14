@@ -57,7 +57,7 @@ const FeatureSection: React.FC = () => {
     <section className="section bg-gray-100">
       <div className="container-custom">
         <div className="text-center mb-16 animate-fade-in">
-          <h2 className="text-primary-900 mb-4">Why Choose ASIM AGRO</h2>
+          <h2 className="text-primary-900 mb-4">Why Choose Asim Agro Research</h2>
           <p className="text-gray-600 max-w-3xl mx-auto">
             With over two decades of experience in developing premium fertilizers, we are committed to enhancing agricultural productivity while promoting sustainable farming practices.
           </p>

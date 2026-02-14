@@ -6,7 +6,7 @@ import ProductsPage from './pages/ProductsPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
-import DealerPage from './pages/DealerPage';
+// import DealerPage from './pages/DealerPage';
 import Login from './pages/Login';
 import Cart from './pages/Cart';
 import AdminDashboard from './pages/AdminDashboard';
@@ -59,14 +59,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route
+              {/* <Route
                 path={`/${routeMap.dealers}`}
                 element={
                   <ProtectedRoute>
                     <DealerPage />
                   </ProtectedRoute>
                 }
-              />
+              /> */}
 
               {/* Admin Routes */}
               <Route

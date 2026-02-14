@@ -178,4 +178,4 @@ CLOUDINARY_API_SECRET=
 
 ## Migration Complete! 🎉
 
-Your Asim Agro application is now running on Firebase Firestore exclusively.
+Your Asim Agro Research application is now running on Firebase Firestore exclusively.

@@ -210,7 +210,7 @@ const AboutPage: React.FC = () => {
             </div>
             <div className="relative animate-slide-up">
               <img
-                src="https://images.pexels.com/photos/3735218/pexels-photo-3735218.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
+                src="about.png"
                 alt="Factory location"
                 className="rounded-lg shadow-lg"
               />
