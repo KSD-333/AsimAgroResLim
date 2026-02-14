@@ -11,8 +11,12 @@ const Footer: React.FC = () => {
           {/* Company Info */}
           <div className="col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <Leaf className="h-8 w-8 text-white" />
-              <span className="font-display font-bold text-2xl">ASIM AGRO</span>
+              <img
+              src="/logo.png"
+              alt="Asim Agro Research logo"
+              className="h-12 w-auto object-contain"
+            />
+              <span className="font-display font-bold text-2xl">ASIM AGRO RESEARCH</span>
             </div>
             <p className="text-primary-100 mb-6">
               Premium fertilizers for enhanced crop yield. Supporting farmers across India with quality agricultural inputs since 2011.
