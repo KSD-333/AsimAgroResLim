@@ -23,21 +23,27 @@ const Footer: React.FC = () => {
             </p>
             <div className="flex space-x-4">
               <a
-                href="#"
+                href="https://www.facebook.com/profile.php?id=61588326418837"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="bg-primary-800 text-white hover:bg-primary-700 transition duration-300 h-10 w-10 rounded-full flex items-center justify-center"
                 aria-label="Facebook"
               >
                 <Facebook className="h-5 w-5" />
               </a>
               <a
-                href="#"
+                href="https://www.instagram.com/asim_agro_research?igsh=cm94NnVndzE3YTE1"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="bg-primary-800 text-white hover:bg-primary-700 transition duration-300 h-10 w-10 rounded-full flex items-center justify-center"
                 aria-label="Instagram"
               >
                 <Instagram className="h-5 w-5" />
               </a>
               <a
-                href="#"
+                href="https://x.com/AgroAsim86581"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="bg-primary-800 text-white hover:bg-primary-700 transition duration-300 h-10 w-10 rounded-full flex items-center justify-center"
                 aria-label="Twitter"
               >

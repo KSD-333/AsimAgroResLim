@@ -21,7 +21,8 @@ import {
   Upload,
   Menu,
   LayoutDashboard,
-  CheckCircle
+  CheckCircle,
+  Download
 } from 'lucide-react';
 import { auth } from '../firebase';
 import { routeMap } from '../routeMap';
@@ -378,6 +379,92 @@ const AdminDashboard = () => {
       setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
     } catch (error) {
       console.error('Error deleting product:', error);
+    }
+  };
+
+  const handleDownloadOrdersCSV = () => {
+    try {
+      // Get filtered orders (same as displayed)
+      const ordersToExport = stats.recentOrders
+        .filter(order => orderFilter === 'all' || order.status === orderFilter)
+        .filter(order => orderUserFilter === 'all' || order.userEmail === orderUserFilter);
+
+      // CSV Headers
+      const headers = [
+        'Order ID',
+        'Customer Email',
+        'Customer Name',
+        'Phone',
+        'Status',
+        'Order Date',
+        'Estimated Delivery',
+        'Products',
+        'Total Items',
+        'Shipping Address',
+        'Admin Notes'
+      ];
+
+      // Convert orders to CSV rows
+      const rows = ordersToExport.map(order => {
+        const createdAt = order.createdAt?.toDate ? 
+          order.createdAt.toDate().toLocaleDateString('en-GB') : 
+          'N/A';
+        
+        const estimatedDelivery = order.estimatedDeliveryDate?.toDate ? 
+          order.estimatedDeliveryDate.toDate().toLocaleDateString('en-GB') : 
+          'N/A';
+
+        const products = order.items?.map((item: any) => 
+          `${item.name} (${item.size}) x${item.quantity}`
+        ).join('; ') || 'N/A';
+
+        const totalItems = order.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+
+        const shippingAddress = order.shippingAddress ? 
+          `${order.shippingAddress.street}, ${order.shippingAddress.city}, ${order.shippingAddress.state}, ${order.shippingAddress.pincode}` : 
+          'N/A';
+
+        return [
+          order.id,
+          order.userEmail || 'N/A',
+          order.userName || 'N/A',
+          order.userPhone || 'N/A',
+          order.status,
+          createdAt,
+          estimatedDelivery,
+          `"${products}"`,
+          totalItems,
+          `"${shippingAddress}"`,
+          order.adminNotes ? `"${order.adminNotes}"` : 'N/A'
+        ];
+      });
+
+      // Create CSV content
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+
+      // Create and trigger download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filterText = orderFilter !== 'all' ? `_${orderFilter}` : '';
+      const filename = `orders${filterText}_${timestamp}.csv`;
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      alert(`Successfully exported ${ordersToExport.length} orders to CSV`);
+    } catch (error) {
+      console.error('Error downloading CSV:', error);
+      alert('Failed to download CSV. Please try again.');
     }
   };
 
@@ -788,6 +875,14 @@ const AdminDashboard = () => {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Orders Management</h2>
           <div className="flex items-center space-x-3 flex-wrap gap-2">
+            <button
+              onClick={handleDownloadOrdersCSV}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200"
+              title="Download orders as CSV"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </button>
             <select
               value={orderUserFilter}
               onChange={(e) => setOrderUserFilter(e.target.value)}
