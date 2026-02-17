@@ -389,6 +389,47 @@ const AdminDashboard = () => {
         .filter(order => orderFilter === 'all' || order.status === orderFilter)
         .filter(order => orderUserFilter === 'all' || order.userEmail === orderUserFilter);
 
+      // Helper function to escape CSV values
+      const escapeCSV = (value: any): string => {
+        if (value === null || value === undefined) return 'N/A';
+        const str = String(value);
+        // If value contains comma, quote, or newline, wrap in quotes and escape internal quotes
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      // Helper function to format date
+      const formatDate = (timestamp: any): string => {
+        try {
+          if (!timestamp) return 'N/A';
+          
+          let date: Date;
+          if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+            date = timestamp.toDate();
+          } else if (timestamp.seconds) {
+            date = new Date(timestamp.seconds * 1000);
+          } else if (timestamp instanceof Date) {
+            date = timestamp;
+          } else {
+            date = new Date(timestamp);
+          }
+
+          // Format: DD/MM/YYYY HH:MM
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = date.getFullYear();
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          
+          return `${day}/${month}/${year} ${hours}:${minutes}`;
+        } catch (error) {
+          console.error('Date formatting error:', error);
+          return 'N/A';
+        }
+      };
+
       // CSV Headers
       const headers = [
         'Order ID',
@@ -398,45 +439,74 @@ const AdminDashboard = () => {
         'Status',
         'Order Date',
         'Estimated Delivery',
-        'Products',
+        'Product Name',
+        'Product Size',
+        'Quantity',
         'Total Items',
-        'Shipping Address',
+        'Street Address',
+        'City',
+        'State',
+        'Pincode',
         'Admin Notes'
       ];
 
-      // Convert orders to CSV rows
-      const rows = ordersToExport.map(order => {
-        const createdAt = order.createdAt?.toDate ? 
-          order.createdAt.toDate().toLocaleDateString('en-GB') : 
-          'N/A';
-        
-        const estimatedDelivery = order.estimatedDeliveryDate?.toDate ? 
-          order.estimatedDeliveryDate.toDate().toLocaleDateString('en-GB') : 
-          'N/A';
-
-        const products = order.items?.map((item: any) => 
-          `${item.name} (${item.size}) x${item.quantity}`
-        ).join('; ') || 'N/A';
-
+      // Convert orders to CSV rows (one row per product item for better readability)
+      const rows: string[][] = [];
+      
+      ordersToExport.forEach(order => {
+        const createdAt = formatDate(order.createdAt);
+        const estimatedDelivery = formatDate(order.estimatedDeliveryDate);
         const totalItems = order.items?.reduce((sum: number, item: any) => sum + item.quantity, 0) || 0;
+        
+        // Extract shipping address parts
+        const street = order.shippingAddress?.street || order.shippingAddress?.address || 'N/A';
+        const city = order.shippingAddress?.city || 'N/A';
+        const state = order.shippingAddress?.state || 'N/A';
+        const pincode = order.shippingAddress?.pincode || order.shippingAddress?.zipCode || 'N/A';
 
-        const shippingAddress = order.shippingAddress ? 
-          `${order.shippingAddress.street}, ${order.shippingAddress.city}, ${order.shippingAddress.state}, ${order.shippingAddress.pincode}` : 
-          'N/A';
-
-        return [
-          order.id,
-          order.userEmail || 'N/A',
-          order.userName || 'N/A',
-          order.userPhone || 'N/A',
-          order.status,
-          createdAt,
-          estimatedDelivery,
-          `"${products}"`,
-          totalItems,
-          `"${shippingAddress}"`,
-          order.adminNotes ? `"${order.adminNotes}"` : 'N/A'
-        ];
+        // If order has items, create a row for each item
+        if (order.items && order.items.length > 0) {
+          order.items.forEach((item: any, index: number) => {
+            rows.push([
+              escapeCSV(order.id),
+              escapeCSV(order.userEmail),
+              escapeCSV(order.userName),
+              escapeCSV(order.userPhone),
+              escapeCSV(order.status),
+              escapeCSV(createdAt),
+              escapeCSV(estimatedDelivery),
+              escapeCSV(item.name),
+              escapeCSV(item.size),
+              escapeCSV(item.quantity),
+              escapeCSV(totalItems),
+              escapeCSV(street),
+              escapeCSV(city),
+              escapeCSV(state),
+              escapeCSV(pincode),
+              escapeCSV(order.adminNotes)
+            ]);
+          });
+        } else {
+          // If no items, still create one row for the order
+          rows.push([
+            escapeCSV(order.id),
+            escapeCSV(order.userEmail),
+            escapeCSV(order.userName),
+            escapeCSV(order.userPhone),
+            escapeCSV(order.status),
+            escapeCSV(createdAt),
+            escapeCSV(estimatedDelivery),
+            'N/A',
+            'N/A',
+            'N/A',
+            escapeCSV(totalItems),
+            escapeCSV(street),
+            escapeCSV(city),
+            escapeCSV(state),
+            escapeCSV(pincode),
+            escapeCSV(order.adminNotes)
+          ]);
+        }
       });
 
       // Create CSV content
@@ -445,8 +515,9 @@ const AdminDashboard = () => {
         ...rows.map(row => row.join(','))
       ].join('\n');
 
-      // Create and trigger download
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      // Add BOM for proper Excel UTF-8 support
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       
@@ -461,7 +532,7 @@ const AdminDashboard = () => {
       link.click();
       document.body.removeChild(link);
       
-      alert(`Successfully exported ${ordersToExport.length} orders to CSV`);
+      alert(`Successfully exported ${ordersToExport.length} orders (${rows.length} items) to CSV`);
     } catch (error) {
       console.error('Error downloading CSV:', error);
       alert('Failed to download CSV. Please try again.');
